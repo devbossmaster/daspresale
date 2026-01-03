@@ -15,6 +15,7 @@ import { tokenIcoAbi } from "@/lib/contracts/abi/tokenIcoAbi";
 import { erc20Abi } from "@/lib/contracts/abi/erc20Abi";
 import { getTokenIcoAddress } from "@/lib/contracts/addresses";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
+import { bsc } from "viem/chains";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as const;
 
@@ -74,23 +75,50 @@ function safeSub(a: bigint, b: bigint) {
   return a > b ? a - b : 0n;
 }
 
-function readableError(e: any) {
+function extractErrText(e: any) {
   return (
     e?.shortMessage ||
     e?.cause?.shortMessage ||
     e?.details ||
     e?.message ||
-    "Transaction failed."
+    ""
   );
 }
+
+function humanizeUiError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+
+  if (!raw) return "Something went wrong. Please try again.";
+
+  if (raw.includes("user rejected") || raw.includes("rejected the request")) {
+    return "Transaction was cancelled in your wallet.";
+  }
+
+  if (raw.includes("insufficient funds")) {
+    return "Insufficient BNB for gas fees.";
+  }
+
+  if (raw.includes("failed to fetch") || raw.includes("http request failed") || raw.includes("network error")) {
+    return "Unable to reach the BSC RPC. Please check your connection or RPC URL.";
+  }
+
+  if (raw.includes("execution reverted") || raw.includes("contractfunctionexecutionerror")) {
+    return "Transaction reverted by the contract. Please review your amount and sale status.";
+  }
+
+  return "Transaction failed. Please try again.";
+}
+
 
 export default function PurchaseTokens() {
   const [usdtAmountText, setUsdtAmountText] = useState<string>("");
   const [uiError, setUiError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const chainId = useChainId();
-  const ico = getTokenIcoAddress(chainId);
+const chainId = useChainId();
+const onBsc = chainId === bsc.id;
+const ico = onBsc ? getTokenIcoAddress(chainId) : undefined;
+
 
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -99,7 +127,7 @@ export default function PurchaseTokens() {
   const { data: dash, isLoading: dashLoading, error: dashError } =
     useTokenIcoDashboard();
 
-  const tokenSymbol = dash?.symbol ?? "TOKEN";
+  const tokenSymbol = dash?.symbol ?? "AERA";
   const tokenDecimals = dash?.decimals ?? 18;
 
   const payToken = dash?.payToken; // USDT
@@ -114,7 +142,7 @@ export default function PurchaseTokens() {
     abi: tokenIcoAbi,
     functionName: "usdtContributed",
     args: address ? [address] : undefined,
-    query: { enabled: !!ico && !!address, refetchInterval: 8_000 },
+    query: { enabled: onBsc && !!ico && !!address, refetchInterval: 8_000 },
   });
   const contributed = (contributedRead.data as bigint | undefined) ?? 0n;
 
@@ -170,7 +198,7 @@ export default function PurchaseTokens() {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!payToken && !!address && !isZeroAddress(payToken),
+      enabled: onBsc && !!payToken && !!address && !isZeroAddress(payToken),
       refetchInterval: 8_000,
     },
   });
@@ -181,7 +209,7 @@ export default function PurchaseTokens() {
     functionName: "allowance",
     args: address && ico ? [address, ico] : undefined,
     query: {
-      enabled: !!payToken && !!address && !!ico && !isZeroAddress(payToken),
+      enabled: onBsc && !!payToken && !!address && !!ico && !isZeroAddress(payToken),
       refetchInterval: 8_000,
     },
   });
@@ -278,14 +306,16 @@ export default function PurchaseTokens() {
     [allowance, usdtAmount]
   );
 
-  const contractNotReady =
-    !ico ||
-    !address ||
-    !payToken ||
-    isZeroAddress(payToken) ||
-    tokenPrice === 0n ||
-    isPaused ||
-    !saleActive;
+ const contractNotReady =
+  !onBsc ||
+  !ico ||
+  !address ||
+  !payToken ||
+  isZeroAddress(payToken) ||
+  tokenPrice === 0n ||
+  isPaused ||
+  !saleActive;
+
 
   const invalidForPurchase =
     inputError ||
@@ -378,7 +408,7 @@ export default function PurchaseTokens() {
 
       setUsdtAmountText("");
     } catch (e: any) {
-      setUiError(readableError(e));
+      setUiError(humanizeUiError(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -413,12 +443,26 @@ export default function PurchaseTokens() {
           </p>
         </div>
       </div>
+   
 
-      {(uiError || dashError) && (
-        <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-          {uiError ?? dashError?.message}
-        </div>
-      )}
+    {(uiError || dashError) && (
+  <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+    <div className="font-semibold">Action required</div>
+    <div className="mt-1 text-red-200">
+      {uiError ? uiError : humanizeUiError(dashError)}
+    </div>
+
+    <details className="mt-2 text-xs text-red-200/80">
+      <summary className="cursor-pointer select-none">Details</summary>
+      <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
+        {uiError
+          ? uiError
+          : (extractErrText(dashError) || "—")}
+      </div>
+    </details>
+  </div>
+)}
+
 
       {!ico && (
         <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">

@@ -22,6 +22,7 @@ import {
   useReadContract,
   useWriteContract,
 } from "wagmi";
+import { bsc } from "wagmi/chains";
 import { isAddress, parseUnits } from "viem";
 
 import { getTokenIcoAddress } from "@/lib/contracts/addresses";
@@ -95,7 +96,12 @@ function shortAddr(a?: string) {
 }
 
 async function copyText(txt: string) {
-  await navigator.clipboard.writeText(txt);
+  try {
+    await navigator.clipboard.writeText(txt);
+  } catch {
+    // Clipboard can fail (permissions/browser); handle via UI message where called
+    throw new Error("Copy failed. Please copy manually.");
+  }
 }
 
 function fmtDateTime(ts?: number) {
@@ -112,33 +118,65 @@ function fmtDateTime(ts?: number) {
 }
 
 function safeToUint64(s: string) {
-  // expects unix seconds text
   const n = Number(s.trim());
   if (!Number.isFinite(n) || n < 0) return null;
   if (n > Number.MAX_SAFE_INTEGER) return null;
   return BigInt(Math.floor(n));
 }
 
+function extractErrText(e: any) {
+  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+}
+
+function humanizeTxError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+  if (!raw) return "Transaction failed. Please try again.";
+  if (raw.includes("user rejected") || raw.includes("rejected the request"))
+    return "Transaction was cancelled in your wallet.";
+  if (raw.includes("insufficient funds"))
+    return "Insufficient funds to pay gas for this transaction.";
+  if (raw.includes("nonce"))
+    return "Nonce issue detected. Please retry, or reset your wallet nonce if needed.";
+  if (raw.includes("network") || raw.includes("chain"))
+    return "Network error. Please ensure your wallet is connected to BNB Smart Chain (BSC).";
+  return "Transaction failed. Please try again.";
+}
+
+function humanizeReadError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+  if (!raw) return "Unable to load contract data. Please try again.";
+  if (raw.includes("network") || raw.includes("chain"))
+    return "Network error. Please ensure your wallet is connected to BNB Smart Chain (BSC).";
+  if (raw.includes("timeout")) return "Request timed out. Please try again.";
+  return "Unable to load contract data. Please try again.";
+}
+
 export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
 
   const chainId = useChainId();
+  const onBsc = chainId === bsc.id;
+
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
-  const explorerBase = chain?.blockExplorers?.default?.url;
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
   const ico = getTokenIcoAddress(chainId);
   const publicClient = usePublicClient();
   const { address: user } = useAccount();
 
-  const { data: dash, isLoading: dashLoading, error: dashError } = useTokenIcoDashboard();
+  const {
+    data: dash,
+    isLoading: dashLoading,
+    error: dashError,
+  } = useTokenIcoDashboard();
 
   // Owner
   const owner = useReadContract({
-    address: ico,
+    address: onBsc ? ico : undefined,
     abi: ownerAbi,
     functionName: "owner",
-    query: { enabled: !!ico, refetchInterval: 8_000 },
+    query: { enabled: !!ico && onBsc, refetchInterval: 8_000 },
   });
 
   const ownerAddr = owner.data as `0x${string}` | undefined;
@@ -154,7 +192,7 @@ export default function AdminPage() {
     let cancelled = false;
 
     async function run() {
-      if (!publicClient) return;
+      if (!publicClient || !onBsc) return;
       try {
         const b = await publicClient.getBlock();
         if (!cancelled) setLastUpdated(Number(b.timestamp));
@@ -169,30 +207,34 @@ export default function AdminPage() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [publicClient]);
+  }, [publicClient, onBsc]);
 
   // UI feedback
   const [uiError, setUiError] = useState<string | null>(null);
+  const [uiErrorDetails, setUiErrorDetails] = useState<string | null>(null);
   const [uiSuccess, setUiSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
+
+  const [showDashDetails, setShowDashDetails] = useState(false);
+  const [showUiDetails, setShowUiDetails] = useState(false);
 
   const { writeContractAsync, isPending } = useWriteContract();
 
   function resetNotices() {
     setUiError(null);
+    setUiErrorDetails(null);
     setUiSuccess(null);
     setLastTx(null);
+    setShowUiDetails(false);
   }
 
-  async function runWrite(
-    label: string,
-    args: Parameters<typeof writeContractAsync>[0]
-  ) {
+  async function runWrite(label: string, args: Parameters<typeof writeContractAsync>[0]) {
     resetNotices();
 
     try {
-      if (!ico) throw new Error("ICO address not configured for this chain.");
+      if (!onBsc) throw new Error("Please switch your wallet network to BNB Smart Chain (BSC).");
+      if (!ico) throw new Error("ICO address is not configured for this chain.");
       if (!isOwner) throw new Error("Only the contract owner can perform this action.");
       if (!publicClient) throw new Error("Public client not ready.");
 
@@ -202,7 +244,9 @@ export default function AdminPage() {
       await publicClient.waitForTransactionReceipt({ hash });
       setUiSuccess(`${label} confirmed on-chain.`);
     } catch (e: any) {
-      setUiError(e?.shortMessage || e?.message || "Transaction failed.");
+      const details = extractErrText(e);
+      setUiError(humanizeTxError(e));
+      setUiErrorDetails(details || null);
     }
   }
 
@@ -217,6 +261,7 @@ export default function AdminPage() {
     const addr = saleTokenInput.trim();
     if (!isAddress(addr)) {
       setUiError("Invalid sale token address.");
+      setUiErrorDetails(null);
       return;
     }
 
@@ -239,6 +284,7 @@ export default function AdminPage() {
     const v = priceInput.trim();
     if (!v || Number(v) <= 0) {
       setUiError("Enter a valid price greater than 0.");
+      setUiErrorDetails(null);
       return;
     }
 
@@ -247,6 +293,7 @@ export default function AdminPage() {
       newPrice = parseUnits(v.replace(/,/g, ""), payDecimals);
     } catch {
       setUiError(`Invalid number format. Max decimals for ${paySymbol}: ${payDecimals}.`);
+      setUiErrorDetails(null);
       return;
     }
 
@@ -266,7 +313,6 @@ export default function AdminPage() {
   const [endInput, setEndInput] = useState<string>("");
 
   useEffect(() => {
-    // initialize inputs from dash when loaded
     if (dash?.start !== undefined) setStartInput(String(dash.start));
     if (dash?.end !== undefined) setEndInput(String(dash.end));
   }, [dash?.start, dash?.end]);
@@ -301,14 +347,15 @@ export default function AdminPage() {
 
     if (s === null || e === null) {
       setUiError("Invalid start/end unix seconds.");
+      setUiErrorDetails(null);
       return;
     }
 
-    // If you want disable window, allow both 0
     const disabled = s === 0n && e === 0n;
     if (!disabled) {
       if (s === 0n || e === 0n || s >= e) {
         setUiError("Invalid sale window. Use (start < end), or set both to 0 to disable.");
+        setUiErrorDetails(null);
         return;
       }
     }
@@ -336,8 +383,10 @@ export default function AdminPage() {
   const tokensRemainingHuman = dash?.tokensRemainingHuman ?? "—";
   const totalTokensSoldHuman = dash?.totalTokensSoldHuman ?? "—";
 
-  const txUrl =
-    lastTx && explorerBase ? `${explorerBase}/tx/${lastTx}` : null;
+  const txUrl = lastTx && explorerBase ? `${explorerBase}/tx/${lastTx}` : null;
+
+  const dashDetails = dashError ? extractErrText(dashError as any) : null;
+  const dashMsg = dashError ? humanizeReadError(dashError as any) : null;
 
   return (
     <div className="w-full min-h-screen bg-transparent text-white space-y-8 px-4 sm:px-6 lg:px-8 pt-6 pb-10">
@@ -355,7 +404,13 @@ export default function AdminPage() {
           )}
         </div>
 
-        {!ico && (
+        {!onBsc && (
+          <div className="mt-3 text-xs sm:text-sm text-amber-200 bg-amber-900/20 border border-amber-800/30 rounded-xl px-3 py-2 inline-block">
+            Please switch your wallet network to BNB Smart Chain (BSC) to use Admin.
+          </div>
+        )}
+
+        {onBsc && !ico && (
           <div className="mt-3 text-xs sm:text-sm text-red-200 bg-red-900/20 border border-red-800/30 rounded-xl px-3 py-2 inline-block">
             ICO address is not configured for this network.
           </div>
@@ -366,15 +421,51 @@ export default function AdminPage() {
       {(dashError || uiError || uiSuccess) && (
         <div className="max-w-3xl mx-auto space-y-3">
           {dashError && (
-            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-              {(dashError as any)?.message ?? "Failed to load dashboard data."}
+            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+              <div className="font-semibold">Unable to load contract data</div>
+              <div className="mt-1 text-red-200">{dashMsg}</div>
+
+              {dashDetails && (
+                <button
+                  type="button"
+                  onClick={() => setShowDashDetails((v) => !v)}
+                  className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
+                >
+                  {showDashDetails ? "Hide details" : "Show details"}
+                </button>
+              )}
+
+              {showDashDetails && dashDetails && (
+                <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
+                  {dashDetails}
+                </div>
+              )}
             </div>
           )}
+
           {uiError && (
-            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-              {uiError}
+            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+              <div className="font-semibold">Action failed</div>
+              <div className="mt-1 text-red-200">{uiError}</div>
+
+              {uiErrorDetails && (
+                <button
+                  type="button"
+                  onClick={() => setShowUiDetails((v) => !v)}
+                  className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
+                >
+                  {showUiDetails ? "Hide details" : "Show details"}
+                </button>
+              )}
+
+              {showUiDetails && uiErrorDetails && (
+                <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
+                  {uiErrorDetails}
+                </div>
+              )}
             </div>
           )}
+
           {uiSuccess && (
             <div className="p-3 rounded-xl border border-emerald-800/40 bg-emerald-900/15 text-sm text-emerald-200">
               {uiSuccess}
@@ -441,7 +532,6 @@ export default function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Remaining tokens */}
                 <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-cyan-900/30 rounded-lg">
@@ -454,7 +544,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Tokens sold */}
                 <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-purple-900/30 rounded-lg">
@@ -467,7 +556,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Contract */}
                 <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-green-900/30 rounded-lg">
@@ -483,11 +571,17 @@ export default function AdminPage() {
                         <button
                           className="p-2 hover:bg-gray-700 rounded-lg"
                           onClick={async () => {
-                            await copyText(ico);
-                            setCopied("ico");
-                            setTimeout(() => setCopied(null), 1200);
+                            try {
+                              await copyText(ico);
+                              setCopied("ico");
+                              setTimeout(() => setCopied(null), 1200);
+                            } catch (e: any) {
+                              setUiError(e?.message ?? "Copy failed.");
+                              setUiErrorDetails(null);
+                            }
                           }}
                           title="Copy"
+                          type="button"
                         >
                           <Copy className="w-4 h-4 text-gray-400" />
                         </button>
@@ -506,12 +600,9 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {copied === "ico" && (
-                    <div className="mt-2 text-xs text-emerald-300">Copied.</div>
-                  )}
+                  {copied === "ico" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
                 </div>
 
-                {/* Owner */}
                 <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-orange-900/30 rounded-lg">
@@ -529,11 +620,17 @@ export default function AdminPage() {
                         <button
                           className="p-2 hover:bg-gray-700 rounded-lg"
                           onClick={async () => {
-                            await copyText(ownerAddr);
-                            setCopied("owner");
-                            setTimeout(() => setCopied(null), 1200);
+                            try {
+                              await copyText(ownerAddr);
+                              setCopied("owner");
+                              setTimeout(() => setCopied(null), 1200);
+                            } catch (e: any) {
+                              setUiError(e?.message ?? "Copy failed.");
+                              setUiErrorDetails(null);
+                            }
                           }}
                           title="Copy"
+                          type="button"
                         >
                           <Copy className="w-4 h-4 text-gray-400" />
                         </button>
@@ -552,9 +649,7 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  {copied === "owner" && (
-                    <div className="mt-2 text-xs text-emerald-300">Copied.</div>
-                  )}
+                  {copied === "owner" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
                 </div>
               </div>
 
@@ -597,13 +692,14 @@ export default function AdminPage() {
                 </div>
 
                 <button
-                  disabled={!ico || !isOwner || isPending || saleTokenAlreadySet}
+                  disabled={!onBsc || !ico || !isOwner || isPending || saleTokenAlreadySet}
                   onClick={onSetSaleToken}
                   className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
-                    !ico || !isOwner || isPending || saleTokenAlreadySet
+                    !onBsc || !ico || !isOwner || isPending || saleTokenAlreadySet
                       ? "bg-gray-700 text-gray-300 cursor-not-allowed"
                       : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
                   }`}
+                  type="button"
                 >
                   {saleTokenAlreadySet
                     ? "Sale Token Already Set"
@@ -613,9 +709,7 @@ export default function AdminPage() {
                 </button>
 
                 {!isOwner && (
-                  <div className="text-xs text-yellow-400">
-                    Only the contract owner can set the sale token.
-                  </div>
+                  <div className="text-xs text-yellow-400">Only the contract owner can set the sale token.</div>
                 )}
               </div>
             </div>
@@ -663,13 +757,14 @@ export default function AdminPage() {
                 </div>
 
                 <button
-                  disabled={!ico || !isOwner || isPending || !saleTokenAlreadySet}
+                  disabled={!onBsc || !ico || !isOwner || isPending || !saleTokenAlreadySet}
                   onClick={onUpdatePrice}
                   className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
-                    !ico || !isOwner || isPending || !saleTokenAlreadySet
+                    !onBsc || !ico || !isOwner || isPending || !saleTokenAlreadySet
                       ? "bg-gray-700 text-gray-300 cursor-not-allowed"
                       : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
                   }`}
+                  type="button"
                 >
                   {isPending ? "Submitting..." : "Update Token Price"}
                 </button>
@@ -680,9 +775,7 @@ export default function AdminPage() {
                   </div>
                 )}
                 {!isOwner && (
-                  <div className="text-xs text-yellow-400">
-                    Only the contract owner can update the price.
-                  </div>
+                  <div className="text-xs text-yellow-400">Only the contract owner can update the price.</div>
                 )}
               </div>
             </div>
@@ -701,40 +794,40 @@ export default function AdminPage() {
               </div>
 
               <div className="space-y-6">
-                {/* Status */}
                 <div className="p-4 rounded-xl border border-gray-800 bg-gray-800/30 flex items-center justify-between">
                   <div>
                     <div className="text-xs text-gray-400">Status</div>
-                    <div className="mt-1 text-lg font-bold">
-                      {dashLoading ? "Loading..." : isPaused ? "Paused" : "Live"}
-                    </div>
+                    <div className="mt-1 text-lg font-bold">{dashLoading ? "Loading..." : isPaused ? "Paused" : "Live"}</div>
                     <div className="mt-1 text-xs text-gray-500">
-                      Sale window: {dashLoading ? "—" : saleWindowEnabled ? "Enabled" : "Disabled (always open)"}
+                      Sale window:{" "}
+                      {dashLoading ? "—" : saleWindowEnabled ? "Enabled" : "Disabled (always open)"}
                     </div>
                   </div>
 
                   <div className="flex gap-2">
                     <button
-                      disabled={!ico || !isOwner || isPending || dashLoading || isPaused}
+                      disabled={!onBsc || !ico || !isOwner || isPending || dashLoading || isPaused}
                       onClick={onPause}
                       className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
-                        !ico || !isOwner || isPending || dashLoading || isPaused
+                        !onBsc || !ico || !isOwner || isPending || dashLoading || isPaused
                           ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
                           : "bg-red-900/20 text-red-200 border-red-800/40 hover:bg-red-900/30"
                       }`}
+                      type="button"
                     >
                       <PauseCircle className="w-4 h-4" />
                       Pause
                     </button>
 
                     <button
-                      disabled={!ico || !isOwner || isPending || dashLoading || !isPaused}
+                      disabled={!onBsc || !ico || !isOwner || isPending || dashLoading || !isPaused}
                       onClick={onUnpause}
                       className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
-                        !ico || !isOwner || isPending || dashLoading || !isPaused
+                        !onBsc || !ico || !isOwner || isPending || dashLoading || !isPaused
                           ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
                           : "bg-emerald-900/15 text-emerald-200 border-emerald-800/40 hover:bg-emerald-900/25"
                       }`}
+                      type="button"
                     >
                       <PlayCircle className="w-4 h-4" />
                       Unpause
@@ -742,7 +835,6 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Sale Window */}
                 <div className="p-4 rounded-xl border border-gray-800 bg-gray-800/30 space-y-4">
                   <div className="text-sm font-semibold">Sale Window (unix seconds)</div>
 
@@ -774,25 +866,27 @@ export default function AdminPage() {
 
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      disabled={!ico || !isOwner || isPending}
+                      disabled={!onBsc || !ico || !isOwner || isPending}
                       onClick={onSetSaleWindow}
                       className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
-                        !ico || !isOwner || isPending
+                        !onBsc || !ico || !isOwner || isPending
                           ? "bg-gray-700 text-gray-300 cursor-not-allowed"
                           : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
                       }`}
+                      type="button"
                     >
                       {isPending ? "Submitting..." : "Update Window"}
                     </button>
 
                     <button
-                      disabled={!ico || !isOwner || isPending}
+                      disabled={!onBsc || !ico || !isOwner || isPending}
                       onClick={onDisableSaleWindow}
                       className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
-                        !ico || !isOwner || isPending
+                        !onBsc || !ico || !isOwner || isPending
                           ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
                           : "bg-gray-900 text-gray-200 border-gray-700 hover:bg-gray-800"
                       }`}
+                      type="button"
                     >
                       Disable Window
                     </button>
@@ -818,9 +912,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <div className="font-bold">{isOwner ? "Connected as Admin" : "Connected"}</div>
-                <div className="text-sm text-gray-400">
-                  {isOwner ? "Administrator Mode" : "Read-only Mode"}
-                </div>
+                <div className="text-sm text-gray-400">{isOwner ? "Administrator Mode" : "Read-only Mode"}</div>
               </div>
             </div>
 

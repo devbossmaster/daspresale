@@ -32,6 +32,27 @@ function formatTs(ts: number) {
     minute: "2-digit",
   });
 }
+function humanizeError(err: unknown) {
+  const msg =
+    (err as any)?.shortMessage ||
+    (err as any)?.message ||
+    (err as any)?.cause?.shortMessage ||
+    (err as any)?.cause?.message ||
+    "";
+
+  const s = String(msg).toLowerCase();
+
+  if (s.includes("127.0.0.1") || s.includes("localhost")) {
+    return "The app is trying to use a local RPC. Please switch your wallet to BSC and ensure your app is configured for BSC RPC only.";
+  }
+  if (s.includes("http request failed") || s.includes("failed to fetch") || s.includes("network error")) {
+    return "Unable to reach the BSC RPC. Please check your RPC URL and connection.";
+  }
+  if (s.includes("execution reverted") || s.includes("contractfunctionexecutionerror")) {
+    return "Contract call reverted. Confirm the presale contract address is correct on BSC.";
+  }
+  return "Could not load token statistics right now. Please try again.";
+}
 
 function computeStatus(input: {
   paused?: boolean;
@@ -136,10 +157,18 @@ export default function TokenStats() {
         </div>
 
         {error && (
-          <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-200">
-            {error.message}
-          </div>
-        )}
+  <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-100">
+    <div className="font-semibold">Unable to load token statistics</div>
+    <div className="mt-1 text-red-200">{humanizeError(error)}</div>
+
+    <details className="mt-2 text-xs text-red-200/80">
+      <summary className="cursor-pointer select-none">Details</summary>
+      <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
+        {(error as any)?.shortMessage || (error as any)?.message || "—"}
+      </div>
+    </details>
+  </div>
+)}
 
         <div className="space-y-3 md:space-y-4">
           {/* Your wallet balance */}

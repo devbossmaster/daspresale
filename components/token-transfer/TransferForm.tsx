@@ -10,10 +10,10 @@ import {
   useWaitForTransactionReceipt,
   useChains,
 } from "wagmi";
+import { bsc } from "wagmi/chains";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import { erc20Abi } from "@/lib/contracts/abi/erc20Abi";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
-import { hardhat } from "wagmi/chains";
 
 function asAddress(v?: string): `0x${string}` | undefined {
   if (!v) return undefined;
@@ -72,16 +72,42 @@ function normalizeDecimalInput(raw: string, decimals: number) {
   return out;
 }
 
+function extractErrText(e: any) {
+  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+}
+
+function humanizeTxError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+
+  if (!raw) return "Transaction failed. Please try again.";
+
+  if (raw.includes("user rejected") || raw.includes("rejected the request")) {
+    return "Transaction was rejected in your wallet.";
+  }
+  if (raw.includes("insufficient funds")) {
+    return "Insufficient BNB to pay gas fees.";
+  }
+  if (raw.includes("nonce")) {
+    return "Nonce issue detected. Please retry in your wallet, or wait for pending transactions to confirm.";
+  }
+  if (raw.includes("replacement transaction underpriced")) {
+    return "Gas price too low for a replacement transaction. Increase gas and retry.";
+  }
+
+  return "Transaction failed. Please try again.";
+}
+
 export default function TransferForm() {
   const { address } = useAccount();
   const chainId = useChainId();
+  const onBsc = chainId === bsc.id;
+
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
 
-  const explorerBase =
-    chainId === hardhat.id ? undefined : chain?.blockExplorers?.default?.url;
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
-  const { data: dash } = useTokenIcoDashboard();
+  const { data: dash, error: dashError, isLoading: dashLoading } = useTokenIcoDashboard();
 
   // Prefer env token override, else presale token
   const tokenAddr =
@@ -95,14 +121,14 @@ export default function TransferForm() {
     address: tokenIsValid ? tokenAddr : undefined,
     abi: erc20Abi,
     functionName: "symbol",
-    query: { enabled: tokenIsValid, refetchInterval: 30_000 },
+    query: { enabled: tokenIsValid && onBsc, refetchInterval: 30_000 },
   });
 
   const tokenDecimals = useReadContract({
     address: tokenIsValid ? tokenAddr : undefined,
     abi: erc20Abi,
     functionName: "decimals",
-    query: { enabled: tokenIsValid, refetchInterval: 30_000 },
+    query: { enabled: tokenIsValid && onBsc, refetchInterval: 30_000 },
   });
 
   const decimals = (tokenDecimals.data ?? dash?.decimals ?? 18) as number;
@@ -113,7 +139,7 @@ export default function TransferForm() {
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address && tokenIsValid, refetchInterval: 8_000 },
+    query: { enabled: !!address && tokenIsValid && onBsc, refetchInterval: 8_000 },
   });
 
   const balanceRaw = (balance.data as bigint | undefined) ?? 0n;
@@ -142,7 +168,8 @@ export default function TransferForm() {
   }, [normalizedAmount, decimals]);
 
   const recipientValid = recipient ? isAddress(recipient) : false;
-  const notSelf = address && recipientValid ? address.toLowerCase() !== recipient.toLowerCase() : true;
+  const notSelf =
+    address && recipientValid ? address.toLowerCase() !== recipient.toLowerCase() : true;
   const hasAmount = amountRaw > 0n;
   const hasEnough = amountRaw <= balanceRaw;
 
@@ -158,10 +185,14 @@ export default function TransferForm() {
     }
   };
 
-  const { writeContractAsync, data: txHash, isPending, error } = useWriteContract();
+  const { writeContractAsync, data: txHash, isPending, error: writeError } = useWriteContract();
   const receipt = useWaitForTransactionReceipt({ hash: txHash });
 
+  const [uiError, setUiError] = useState<string | null>(null);
+  const [uiErrorDetails, setUiErrorDetails] = useState<string | null>(null);
+
   const canTransfer =
+    onBsc &&
     !!address &&
     tokenIsValid &&
     recipientValid &&
@@ -173,20 +204,38 @@ export default function TransferForm() {
     !amountError;
 
   async function handleTransfer() {
+    setUiError(null);
+    setUiErrorDetails(null);
+
+    if (!onBsc) {
+      setUiError("Please switch your wallet network to BNB Smart Chain (BSC).");
+      return;
+    }
     if (!canTransfer || !tokenAddr) return;
 
-    await writeContractAsync({
-      address: tokenAddr,
-      abi: erc20Abi,
-      functionName: "transfer",
-      args: [recipient as `0x${string}`, amountRaw],
-    });
+    try {
+      await writeContractAsync({
+        address: tokenAddr,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [recipient as `0x${string}`, amountRaw],
+      });
 
-    // Optional UX: keep recipient, clear amount
-    setAmountText("");
+      // Optional UX: keep recipient, clear amount
+      setAmountText("");
+    } catch (e: any) {
+      setUiError(humanizeTxError(e));
+      setUiErrorDetails(extractErrText(e) || null);
+    }
   }
 
   const txUrl = txHash && explorerBase ? `${explorerBase}/tx/${txHash}` : undefined;
+
+  const headerLine = isPending
+    ? "Confirm in wallet…"
+    : receipt.isLoading
+      ? "Waiting confirmation…"
+      : `Transfer ${symbol}`;
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-6 lg:p-8">
@@ -200,9 +249,31 @@ export default function TransferForm() {
         </div>
       </div>
 
-      {!tokenIsValid && (
+      {!onBsc && (
         <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
-          Token address is not available on this network.
+          Please switch your wallet network to BNB Smart Chain (BSC) to use transfers.
+        </div>
+      )}
+
+      {(uiError || dashError || writeError) && (
+        <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+          <div className="font-semibold">Action required</div>
+          <div className="mt-1 text-red-200">
+            {uiError ?? humanizeTxError(writeError) ?? "Unable to load token data. Please try again."}
+          </div>
+
+          {uiErrorDetails && (
+            <details className="mt-2 text-xs text-red-200/80">
+              <summary className="cursor-pointer select-none">Details</summary>
+              <div className="mt-2 whitespace-pre-wrap break-words opacity-80">{uiErrorDetails}</div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {onBsc && !dashLoading && !tokenIsValid && (
+        <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
+          Token address is not available. Set NEXT_PUBLIC_TMSAT_TOKEN_ADDRESS or ensure the presale token is configured.
         </div>
       )}
 
@@ -227,11 +298,7 @@ export default function TransferForm() {
             type="button"
             title="Copy token address"
           >
-            {copied ? (
-              <Check className="w-4 h-4 text-green-400" />
-            ) : (
-              <Copy className="w-4 h-4 text-gray-400" />
-            )}
+            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
           </button>
         </div>
       </div>
@@ -253,7 +320,7 @@ export default function TransferForm() {
                 if (balanceHuman !== "—") setAmountText(balanceHuman);
               }}
               className="text-xs sm:text-sm text-cyan-400 hover:text-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={balanceHuman === "—" || !tokenIsValid}
+              disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
               type="button"
             >
               Max
@@ -342,16 +409,9 @@ export default function TransferForm() {
           type="button"
         >
           <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-          <span>
-            {isPending
-              ? "Confirm in wallet..."
-              : receipt.isLoading
-                ? "Waiting confirmation..."
-                : `Transfer ${symbol}`}
-          </span>
+          <span>{headerLine}</span>
         </button>
 
-        {/* Inline validations (professional UX) */}
         {!address && (
           <div className="flex items-start gap-2 text-xs sm:text-sm text-amber-200 bg-amber-900/20 border border-amber-800/40 rounded-xl p-3">
             <AlertCircle className="w-4 h-4 mt-0.5" />
@@ -372,8 +432,9 @@ export default function TransferForm() {
           </div>
         )}
 
-        {error && <div className="text-xs sm:text-sm text-red-300">{error.message}</div>}
-        {receipt.isSuccess && <div className="text-xs sm:text-sm text-green-300">Transfer confirmed.</div>}
+        {receipt.isSuccess && (
+          <div className="text-xs sm:text-sm text-green-300">Transfer confirmed.</div>
+        )}
       </div>
     </div>
   );

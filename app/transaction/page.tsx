@@ -1,18 +1,17 @@
 // app/transaction/page.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Wallet as WalletIcon,
   DollarSign,
   ShoppingBag,
   Clock,
-  CheckCircle,
   ExternalLink,
 } from "lucide-react";
 import { useChainId, useChains } from "wagmi";
+import { bsc } from "wagmi/chains";
 import { formatUnits } from "viem";
-import { hardhat } from "wagmi/chains";
 
 import { useMounted } from "@/lib/hooks/useMounted";
 import { useRecentPurchases } from "@/lib/hooks/useRecentPurchases";
@@ -35,7 +34,7 @@ function formatDecimalStr(v?: string, maxFrac = 6) {
 function formatDateTimeClient(ts: number) {
   if (!ts) return "—";
   const d = new Date(ts * 1000);
-  // format close to your screenshot: YYYY-MM-DD HH:mm:ss
+  // YYYY-MM-DD HH:mm:ss
   const pad = (n: number) => String(n).padStart(2, "0");
   const yyyy = d.getFullYear();
   const mm = pad(d.getMonth() + 1);
@@ -46,20 +45,41 @@ function formatDateTimeClient(ts: number) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
+function extractErrText(e: any) {
+  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+}
+
+function humanizeReadError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+  if (!raw) return "Unable to load transactions. Please try again.";
+  if (raw.includes("network") || raw.includes("chain"))
+    return "Network error. Please reconnect your wallet and retry.";
+  if (raw.includes("timeout")) return "Request timed out. Please try again.";
+  return "Unable to load transactions. Please try again.";
+}
+
 export default function TransactionPage() {
   const mounted = useMounted();
 
   const chainId = useChainId();
+  const onBsc = chainId === bsc.id;
+
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
-  const explorerBase =
-    chainId === hardhat.id ? undefined : chain?.blockExplorers?.default?.url;
-
-  const { data: dash, isLoading: dashLoading, error: dashError } = useTokenIcoDashboard();
+  const {
+    data: dash,
+    isLoading: dashLoading,
+    error: dashError,
+  } = useTokenIcoDashboard();
 
   // Increase limit/range on the dedicated page
-  const { rows, isLoading: logsLoading, error: logsError } = useRecentPurchases({
+  const {
+    rows,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useRecentPurchases({
     limit: 200,
     blockRange: 200_000n,
   });
@@ -96,7 +116,10 @@ export default function TransactionPage() {
     });
   }, [rows, payDecimals, tokenDecimals, explorerBase, mounted]);
 
-  const pageError = (dashError as Error | null) || (logsError as Error | null);
+  const readError = (dashError as any) || (logsError as any);
+  const [showDetails, setShowDetails] = useState(false);
+  const detailsText = readError ? extractErrText(readError) : null;
+  const errorText = readError ? humanizeReadError(readError) : null;
 
   return (
     <div className="min-h-screen text-white bg-gradient-to-b from-[#140b24] via-[#06060b] to-black">
@@ -108,14 +131,13 @@ export default function TransactionPage() {
               Transaction
             </h1>
             <p className="mt-1 text-xs sm:text-sm text-gray-400">
-              Purchase History
+              Purchase History{" "}
               <span className="ml-2 text-gray-500">
-                ({isLoading ? "Loading..." : `Showing ${txs.length} of ${txs.length} records`})
+                ({isLoading ? "Loading..." : `Showing ${txs.length} records`})
               </span>
             </p>
           </div>
 
-          {/* Optional right-side links to match your screenshot style (remove if your layout already has nav) */}
           <div className="hidden md:flex items-center gap-6 text-sm text-gray-400">
             <a className="hover:text-white transition-colors" href="#" onClick={(e) => e.preventDefault()}>
               Whitepaper
@@ -129,10 +151,34 @@ export default function TransactionPage() {
           </div>
         </div>
 
-        {/* Error */}
-        {pageError && (
-          <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-            {pageError.message}
+        {/* Network gating (BSC only) */}
+        {!onBsc && (
+          <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
+            Please switch your wallet network to BNB Smart Chain (BSC) to view purchase history.
+          </div>
+        )}
+
+        {/* Error (professional + optional details) */}
+        {readError && (
+          <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+            <div className="font-semibold">Unable to load purchase history</div>
+            <div className="mt-1 text-red-200">{errorText}</div>
+
+            {detailsText && (
+              <button
+                type="button"
+                onClick={() => setShowDetails((v) => !v)}
+                className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
+              >
+                {showDetails ? "Hide details" : "Show details"}
+              </button>
+            )}
+
+            {showDetails && detailsText && (
+              <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
+                {detailsText}
+              </div>
+            )}
           </div>
         )}
 
@@ -183,7 +229,7 @@ export default function TransactionPage() {
               </thead>
 
               <tbody className="divide-y divide-white/10">
-                {!isLoading && txs.length === 0 && (
+                {!isLoading && !readError && txs.length === 0 && (
                   <tr>
                     <td className="px-6 py-6 text-sm text-gray-400" colSpan={6}>
                       No purchases found in the scanned block range.
@@ -260,7 +306,7 @@ export default function TransactionPage() {
 
           {/* Mobile cards */}
           <div className="md:hidden p-4 space-y-3">
-            {!isLoading && txs.length === 0 && (
+            {!isLoading && !readError && txs.length === 0 && (
               <div className="p-4 rounded-xl border border-white/10 bg-white/[0.03] text-sm text-gray-400">
                 No purchases found in the scanned block range.
               </div>
@@ -285,6 +331,7 @@ export default function TransactionPage() {
                         <span className="text-fuchsia-300 font-medium">{tx.walletShort}</span>
                       )}
                     </div>
+
                     <div className="mt-2 text-xs text-gray-400">Time &amp; Date</div>
                     <div className="mt-1 text-sm text-gray-300">{tx.dateTime}</div>
                   </div>
@@ -320,7 +367,7 @@ export default function TransactionPage() {
                       View on Explorer <ExternalLink className="h-4 w-4" />
                     </a>
                   ) : (
-                    <div className="text-xs text-gray-500">Explorer not available on local Hardhat.</div>
+                    <div className="text-xs text-gray-500">Explorer not available on this network.</div>
                   )}
                 </div>
               </div>
@@ -334,7 +381,6 @@ export default function TransactionPage() {
           </div>
         </div>
 
-        {/* Small footer note */}
         <div className="mt-4 text-xs text-gray-500">
           Data is derived from on-chain <span className="text-gray-400">TokensPurchased</span> events.
         </div>

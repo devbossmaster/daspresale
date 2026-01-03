@@ -3,7 +3,7 @@
 
 import { useMemo } from "react";
 import { useChainId, useChains } from "wagmi";
-import { bsc, hardhat } from "wagmi/chains";
+import { bsc } from "wagmi/chains";
 import { formatUnits } from "viem";
 import { DollarSign, Target, Globe, AlertTriangle } from "lucide-react";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
@@ -66,7 +66,7 @@ export default function RaisedFunds() {
   // Investors from on-chain events (recent range; for full history use an indexer/subgraph)
   const { investorsCount, isLoading: investorsLoading } = useRecentPurchases({
     limit: 500,
-    blockRange: chainId === hardhat.id ? 0n : 50_000n,
+    blockRange: 50_000n,
   });
 
   const payDecimals = data?.payDecimals ?? 18;
@@ -226,11 +226,8 @@ export default function RaisedFunds() {
               <div>
                 <p className="text-xs text-gray-400">Network</p>
                 <p className="text-lg md:text-xl font-bold mt-0.5">
-                  {chainId === hardhat.id
-                    ? "Hardhat"
-                    : chainId === bsc.id
-                      ? "BSC"
-                      : chain?.name ?? "—"}
+                 {chainId === bsc.id ? "BSC" : chain?.name ?? "—"}
+
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">Chain ID: {chainId}</p>
               </div>

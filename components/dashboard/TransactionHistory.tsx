@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useChains, useChainId } from "wagmi";
-import { hardhat } from "wagmi/chains";
+import { bsc } from "wagmi/chains";
 import { formatUnits } from "viem";
 import { CheckCircle, ExternalLink, User } from "lucide-react";
 
@@ -22,7 +22,24 @@ function trimDecimals(value: string, max: number) {
   const [i, f] = value.split(".");
   return `${i}.${f.slice(0, max)}`.replace(/\.?0+$/, "");
 }
+function humanizeError(err: unknown) {
+  const msg =
+    (err as any)?.shortMessage ||
+    (err as any)?.message ||
+    (err as any)?.cause?.shortMessage ||
+    (err as any)?.cause?.message ||
+    "";
 
+  const s = String(msg).toLowerCase();
+
+  if (s.includes("127.0.0.1") || s.includes("localhost")) {
+    return "The app is using a local RPC. Switch wallet to BSC and configure BSC RPC in your wagmi transports.";
+  }
+  if (s.includes("http request failed") || s.includes("failed to fetch") || s.includes("network error")) {
+    return "Unable to reach the BSC RPC. Please check your RPC URL and connection.";
+  }
+  return "Could not load recent purchases right now. Please try again.";
+}
 function formatDateClient(ts: number) {
   if (!ts) return { date: "—", time: "—" };
   const d = new Date(ts * 1000);
@@ -53,7 +70,9 @@ export default function TransactionHistory() {
   const paySymbol = dash?.paySymbol ?? "USDT";
 
   // Hardhat has no real explorer
-  const explorerBase = chainId === hardhat.id ? undefined : chain?.blockExplorers?.default?.url;
+const explorerBase = chainId === bsc.id
+  ? (chain?.blockExplorers?.default?.url ?? "https://bscscan.com")
+  : undefined;
   const contractUrl = explorerBase && ico ? `${explorerBase}/address/${ico}` : undefined;
 
   const txs = useMemo(() => {
@@ -111,12 +130,20 @@ export default function TransactionHistory() {
           </div>
         )}
 
-        {error && (
-          <div className="mt-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-200">
-            {error.message}
-          </div>
-        )}
+       {error && (
+  <div className="mt-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-100">
+    <div className="font-semibold">Unable to load recent purchases</div>
+    <div className="mt-1 text-red-200">{humanizeError(error)}</div>
+
+    <details className="mt-2 text-xs text-red-200/80">
+      <summary className="cursor-pointer select-none">Details</summary>
+      <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
+        {(error as any)?.shortMessage || (error as any)?.message || "—"}
       </div>
+    </details>
+  </div>
+)}
+</div>
 
       {/* Mobile cards */}
       <div className="sm:hidden space-y-3 p-4">
@@ -173,7 +200,7 @@ export default function TransactionHistory() {
               </a>
             ) : (
               <div className="mt-3 text-xs text-gray-500">
-                Explorer not available on local Hardhat.
+                Explorer not available.
               </div>
             )}
           </div>

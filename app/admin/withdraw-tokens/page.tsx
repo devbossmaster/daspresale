@@ -19,6 +19,7 @@ import {
   useReadContract,
   useWriteContract,
 } from "wagmi";
+import { bsc } from "wagmi/chains";
 import { formatUnits, parseAbiItem } from "viem";
 
 import { erc20Abi } from "@/lib/contracts/abi/erc20Abi";
@@ -45,13 +46,37 @@ const withdrawAbi = [
   },
 ] as const;
 
+const E_TokensWithdrawn = parseAbiItem("event TokensWithdrawn(uint256 amountTokens)");
+
+type WithdrawRow = {
+  amountTokens: bigint;
+  txHash: `0x${string}`;
+  blockNumber: bigint;
+  timestamp: number;
+  time: string;
+  txUrl?: string;
+};
+
 function shortAddr(a?: string) {
   if (!a) return "—";
   return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
 
+/** Format a decimal string safely without Number() precision loss. */
+function formatDecimalStr(v?: string, maxFrac = 6) {
+  if (!v) return "—";
+  const [intRaw, fracRaw = ""] = v.split(".");
+  const intPart = (intRaw || "0").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const frac = fracRaw.slice(0, maxFrac).replace(/0+$/, "");
+  return frac.length ? `${intPart}.${frac}` : intPart;
+}
+
 async function copyText(txt: string) {
-  await navigator.clipboard.writeText(txt);
+  try {
+    await navigator.clipboard.writeText(txt);
+  } catch {
+    throw new Error("Copy failed. Please copy manually.");
+  }
 }
 
 function formatDateTime(ts: number) {
@@ -67,22 +92,33 @@ function formatDateTime(ts: number) {
   });
 }
 
-const E_TokensWithdrawn = parseAbiItem("event TokensWithdrawn(uint256 amountTokens)");
+function extractErrText(e: any) {
+  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+}
 
-type WithdrawRow = {
-  amountTokens: bigint;
-  txHash: `0x${string}`;
-  blockNumber: bigint;
-  timestamp: number;
-  time: string;
-  txUrl?: string;
-};
+function humanizeTxError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+  if (!raw) return "Transaction failed. Please try again.";
+  if (raw.includes("user rejected") || raw.includes("rejected the request"))
+    return "Transaction was cancelled in your wallet.";
+  if (raw.includes("insufficient funds"))
+    return "Insufficient funds to pay gas for this transaction.";
+  if (raw.includes("nonce"))
+    return "Nonce issue detected. Please retry, or reset your wallet nonce if needed.";
+  if (raw.includes("network") || raw.includes("chain"))
+    return "Network error. Please ensure your wallet is connected to BNB Smart Chain (BSC).";
+  return "Transaction failed. Please try again.";
+}
 
 export default function WithdrawTokensPage() {
   const chainId = useChainId();
+  const onBsc = chainId === bsc.id;
+
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
-  const explorerBase = chain?.blockExplorers?.default?.url;
+
+  // Explorer only when on BSC
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
   const ico = getTokenIcoAddress(chainId);
   const publicClient = usePublicClient();
@@ -91,8 +127,10 @@ export default function WithdrawTokensPage() {
   const { address: user } = useAccount();
 
   const [uiError, setUiError] = useState<string | null>(null);
+  const [uiErrorDetails, setUiErrorDetails] = useState<string | null>(null);
   const [uiSuccess, setUiSuccess] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   // Sale token + ICO stats from your hook
   const { data: dash, isLoading: dashLoading } = useTokenIcoDashboard();
@@ -101,12 +139,14 @@ export default function WithdrawTokensPage() {
   const saleDecimals = dash?.decimals ?? 18;
   const tokensRemaining = dash?.tokensRemaining ?? 0n;
 
-  // Owner from contract
+  const contractReady = onBsc && !!ico && !!publicClient;
+
+  // Owner from contract (disable reads off-BSC or if no ICO)
   const owner = useReadContract({
-    address: ico,
+    address: contractReady ? ico : undefined,
     abi: ownerAbi,
     functionName: "owner",
-    query: { enabled: !!ico, refetchInterval: 8_000 },
+    query: { enabled: contractReady, refetchInterval: 8_000 },
   });
 
   const ownerAddr = (owner.data ?? undefined) as `0x${string}` | undefined;
@@ -116,9 +156,9 @@ export default function WithdrawTokensPage() {
     return user.toLowerCase() === ownerAddr.toLowerCase();
   }, [user, ownerAddr]);
 
-  // Optional: token name from ERC20
+  // Optional: token name from ERC20 (disable if token missing)
   const tokenName = useReadContract({
-    address: saleTokenAddr,
+    address: contractReady && saleTokenAddr ? saleTokenAddr : undefined,
     abi: [
       ...erc20Abi,
       {
@@ -130,7 +170,7 @@ export default function WithdrawTokensPage() {
       },
     ] as const,
     functionName: "name",
-    query: { enabled: !!saleTokenAddr },
+    query: { enabled: contractReady && !!saleTokenAddr },
   });
 
   // Withdraw write
@@ -139,12 +179,26 @@ export default function WithdrawTokensPage() {
   const [confirmStage, setConfirmStage] = useState<"idle" | "armed">("idle");
   const [confirmChecked, setConfirmChecked] = useState(false);
 
-  const canWithdraw = isOwner && !!ico && tokensRemaining > 0n && !isPending;
+  // Button logic:
+  // - If idle: allow arming (owner + ready + has tokens + not pending)
+  // - If armed: allow submit only if checkbox checked
+  const canArm = isOwner && contractReady && tokensRemaining > 0n && !isPending;
+  const canSubmit = canArm && confirmStage === "armed" && confirmChecked;
+
+  function resetNotices() {
+    setUiError(null);
+    setUiErrorDetails(null);
+    setUiSuccess(null);
+    setLastTx(null);
+  }
 
   async function handleWithdraw() {
-    setUiError(null);
-    setUiSuccess(null);
+    resetNotices();
 
+    if (!onBsc) {
+      setUiError("Please switch your wallet network to BNB Smart Chain (BSC).");
+      return;
+    }
     if (!ico) {
       setUiError("ICO address not configured for this chain.");
       return;
@@ -162,12 +216,13 @@ export default function WithdrawTokensPage() {
       return;
     }
 
-    // First click arms the confirmation
+    // First click arms the confirmation (no checkbox required)
     if (confirmStage === "idle") {
       setConfirmStage("armed");
       return;
     }
 
+    // Second click submits (requires checkbox)
     if (!confirmChecked) {
       setUiError("Please confirm the irreversible action checkbox.");
       return;
@@ -188,7 +243,9 @@ export default function WithdrawTokensPage() {
       setConfirmStage("idle");
       setConfirmChecked(false);
     } catch (e: any) {
-      setUiError(e?.shortMessage || e?.message || "Transaction failed.");
+      setUiError(humanizeTxError(e));
+      const details = extractErrText(e);
+      setUiErrorDetails(details || null);
     }
   }
 
@@ -200,15 +257,15 @@ export default function WithdrawTokensPage() {
     let cancelled = false;
 
     async function run() {
-      if (!publicClient || !ico) return;
+      if (!contractReady || !ico) return;
 
       setRecentLoading(true);
       try {
-        const toBlock = (latestBlock ?? (await publicClient.getBlockNumber())) as bigint;
+        const toBlock = (latestBlock ?? (await publicClient!.getBlockNumber())) as bigint;
         const blockRange = 100_000n;
         const fromBlock = toBlock > blockRange ? toBlock - blockRange : 0n;
 
-        const logs = await publicClient.getLogs({
+        const logs = await publicClient!.getLogs({
           address: ico,
           event: E_TokensWithdrawn,
           fromBlock,
@@ -238,7 +295,7 @@ export default function WithdrawTokensPage() {
 
         await Promise.all(
           uniqBlocks.map(async (bn) => {
-            const b = await publicClient.getBlock({ blockNumber: bn });
+            const b = await publicClient!.getBlock({ blockNumber: bn });
             tsMap.set(bn, Number(b.timestamp));
           })
         );
@@ -250,26 +307,19 @@ export default function WithdrawTokensPage() {
 
         if (!cancelled) setRecent(final);
       } catch {
-        // ignore in UI (page still usable)
+        // keep page usable even if logs fail
+        if (!cancelled) setRecent([]);
       } finally {
         if (!cancelled) setRecentLoading(false);
       }
     }
 
     run();
-    return () => {
-      cancelled = true;
-    };
-  }, [publicClient, ico, latestBlock, explorerBase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractReady, ico, latestBlock, explorerBase]);
 
   const remainingHuman = useMemo(() => {
-    try {
-      return Number(formatUnits(tokensRemaining, saleDecimals)).toLocaleString(undefined, {
-        maximumFractionDigits: 6,
-      });
-    } catch {
-      return "—";
-    }
+    return formatDecimalStr(formatUnits(tokensRemaining, saleDecimals), 6);
   }, [tokensRemaining, saleDecimals]);
 
   const txUrl = lastTx && explorerBase ? `${explorerBase}/tx/${lastTx}` : null;
@@ -286,13 +336,38 @@ export default function WithdrawTokensPage() {
         </p>
       </div>
 
+      {/* Network gating */}
+      {!onBsc && (
+        <div className="p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
+          Please switch your wallet network to <b>BNB Smart Chain (BSC)</b> to use this page.
+        </div>
+      )}
+
       {(uiError || uiSuccess) && (
         <div className="space-y-3">
           {uiError && (
             <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-              {uiError}
+              <div className="font-semibold">Action failed</div>
+              <div className="mt-1">{uiError}</div>
+
+              {uiErrorDetails && (
+                <button
+                  type="button"
+                  onClick={() => setUiErrorDetails((v) => (v ? null : uiErrorDetails))}
+                  className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
+                >
+                  Hide details
+                </button>
+              )}
+
+              {uiErrorDetails && (
+                <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
+                  {uiErrorDetails}
+                </div>
+              )}
             </div>
           )}
+
           {uiSuccess && (
             <div className="p-3 rounded-xl border border-emerald-800/40 bg-emerald-900/15 text-sm text-emerald-200">
               {uiSuccess}
@@ -335,8 +410,17 @@ export default function WithdrawTokensPage() {
                   {ico && (
                     <button
                       className="p-2 hover:bg-gray-700 rounded-lg"
-                      onClick={() => copyText(ico)}
+                      onClick={async () => {
+                        try {
+                          await copyText(ico);
+                          setCopied("ico");
+                          setTimeout(() => setCopied(null), 1200);
+                        } catch (e: any) {
+                          setUiError(e?.message ?? "Copy failed.");
+                        }
+                      }}
                       title="Copy"
+                      type="button"
                     >
                       <Copy className="w-4 h-4 text-gray-400" />
                     </button>
@@ -354,6 +438,7 @@ export default function WithdrawTokensPage() {
                   )}
                 </div>
               </div>
+              {copied === "ico" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
             </div>
 
             {/* Owner */}
@@ -367,8 +452,17 @@ export default function WithdrawTokensPage() {
                   {ownerAddr && (
                     <button
                       className="p-2 hover:bg-gray-700 rounded-lg"
-                      onClick={() => copyText(ownerAddr)}
+                      onClick={async () => {
+                        try {
+                          await copyText(ownerAddr);
+                          setCopied("owner");
+                          setTimeout(() => setCopied(null), 1200);
+                        } catch (e: any) {
+                          setUiError(e?.message ?? "Copy failed.");
+                        }
+                      }}
                       title="Copy"
+                      type="button"
                     >
                       <Copy className="w-4 h-4 text-gray-400" />
                     </button>
@@ -395,6 +489,7 @@ export default function WithdrawTokensPage() {
                   <span className="text-yellow-400 font-medium">(Not owner)</span>
                 )}
               </div>
+              {copied === "owner" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
             </div>
 
             {/* Network */}
@@ -402,10 +497,12 @@ export default function WithdrawTokensPage() {
               <div className="text-xs sm:text-sm text-gray-400 mb-2">Network</div>
               <div className="p-4 bg-gray-800/30 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <div className={`w-2 h-2 rounded-full ${onBsc ? "bg-green-500" : "bg-amber-500"} animate-pulse`} />
                   <span className="text-sm sm:text-base font-medium">{chain?.name ?? "—"}</span>
                 </div>
-                <div className="text-xs sm:text-sm text-green-400">Connected</div>
+                <div className={`text-xs sm:text-sm ${onBsc ? "text-green-400" : "text-amber-300"}`}>
+                  {onBsc ? "Connected" : "Wrong network"}
+                </div>
               </div>
             </div>
           </div>
@@ -509,36 +606,39 @@ export default function WithdrawTokensPage() {
 
             <button
               onClick={handleWithdraw}
-              disabled={!canWithdraw || (confirmStage === "armed" && !confirmChecked)}
+              disabled={confirmStage === "idle" ? !canArm : !canSubmit}
               className={`w-full py-3 sm:py-4 font-bold text-base sm:text-lg rounded-2xl transition-all duration-200 flex items-center justify-center gap-3
                 ${
                   confirmStage === "armed"
                     ? "bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500"
                     : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
                 }
-                ${(!canWithdraw || (confirmStage === "armed" && !confirmChecked)) ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.01]"}
+                ${((confirmStage === "idle" ? !canArm : !canSubmit)) ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.01]"}
                 active:scale-[0.99]
               `}
+              type="button"
             >
               <Wallet className="w-5 h-5" />
               <span>
-                {!ico
-                  ? "ICO not configured"
-                  : !isOwner
-                    ? "Owner only"
-                    : tokensRemaining === 0n
-                      ? "No tokens to withdraw"
-                      : isPending
-                        ? "Submitting..."
-                        : confirmStage === "armed"
-                          ? `Confirm Withdraw All ${saleSymbol}`
-                          : `Withdraw All ${saleSymbol}`}
+                {!onBsc
+                  ? "Switch to BSC"
+                  : !ico
+                    ? "ICO not configured"
+                    : !isOwner
+                      ? "Owner only"
+                      : tokensRemaining === 0n
+                        ? "No tokens to withdraw"
+                        : isPending
+                          ? "Submitting..."
+                          : confirmStage === "armed"
+                            ? `Confirm Withdraw All ${saleSymbol}`
+                            : `Withdraw All ${saleSymbol}`}
               </span>
             </button>
 
             {confirmStage === "armed" && (
               <div className="text-xs text-gray-400">
-                Click the button again to submit after ticking the checkbox.
+                Tick the checkbox, then click the button again to submit.
               </div>
             )}
           </div>
@@ -572,13 +672,13 @@ export default function WithdrawTokensPage() {
             ) : (
               <div className="space-y-3">
                 {recent.map((r) => (
-                  <div key={`${r.txHash}:${r.blockNumber.toString()}`} className="p-4 bg-gray-800/30 rounded-xl border border-gray-800">
+                  <div
+                    key={`${r.txHash}:${r.blockNumber.toString()}`}
+                    className="p-4 bg-gray-800/30 rounded-xl border border-gray-800"
+                  >
                     <div className="text-xs text-gray-400">{r.time}</div>
                     <div className="mt-1 font-bold text-cyan-300">
-                      {Number(formatUnits(r.amountTokens, saleDecimals)).toLocaleString(undefined, {
-                        maximumFractionDigits: 6,
-                      })}{" "}
-                      {saleSymbol}
+                      {formatDecimalStr(formatUnits(r.amountTokens, saleDecimals), 6)} {saleSymbol}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between">

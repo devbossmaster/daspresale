@@ -3,11 +3,11 @@
 import { useMemo } from "react";
 import { History, CheckCircle, ExternalLink, User } from "lucide-react";
 import { useChainId, useChains } from "wagmi";
+import { bsc } from "wagmi/chains";
 import { formatUnits } from "viem";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
 import { useRecentPurchases } from "@/lib/hooks/useRecentPurchases";
 import { useMounted } from "@/lib/hooks/useMounted";
-import { hardhat } from "wagmi/chains";
 
 function shortAddr(a: string) {
   return a ? `${a.slice(0, 6)}...${a.slice(-4)}` : "—";
@@ -25,31 +25,70 @@ function formatDateClient(ts: number) {
   if (!ts) return { date: "—", time: "—" };
   const d = new Date(ts * 1000);
   return {
-    date: d.toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit" }),
-    time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    date: d.toLocaleString(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }),
+    time: d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }),
   };
+}
+
+function extractErrText(e: any) {
+  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+}
+
+function humanizeReadError(e: any) {
+  const raw = String(extractErrText(e) || "").toLowerCase();
+
+  if (!raw) return "Unable to load transactions. Please try again.";
+
+  if (
+    raw.includes("failed to fetch") ||
+    raw.includes("network error") ||
+    raw.includes("http request failed")
+  ) {
+    return "Unable to reach the BSC RPC. Please check your connection or RPC URL.";
+  }
+
+  if (raw.includes("rate limit") || raw.includes("429")) {
+    return "RPC is rate-limiting requests. Please retry in a moment.";
+  }
+
+  return "Unable to load transactions. Please try again.";
 }
 
 export default function RecentTransactions() {
   const mounted = useMounted();
   const { data: dash, error: dashError } = useTokenIcoDashboard();
-  const { rows, isLoading, error: logsError } = useRecentPurchases({ limit: 10, blockRange: 50_000n });
+
+  const chainId = useChainId();
+  const onBsc = chainId === bsc.id;
+
+  // Avoid scanning when not on BSC
+  const { rows, isLoading, error: logsError } = useRecentPurchases(
+    onBsc ? { limit: 10, blockRange: 50_000n } : { limit: 0 }
+  );
 
   const tokenSymbol = dash?.symbol ?? "TOKEN";
   const tokenDecimals = dash?.decimals ?? 18;
   const paySymbol = dash?.paySymbol ?? "USDT";
   const payDecimals = dash?.payDecimals ?? 18;
 
-  const chainId = useChainId();
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
 
-  const explorerBase =
-    chainId === hardhat.id ? undefined : chain?.blockExplorers?.default?.url;
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
   const txs = useMemo(() => {
     return rows.map((r) => {
-      const { date, time } = mounted ? formatDateClient(r.timestamp) : { date: "—", time: "—" };
+      const { date, time } = mounted
+        ? formatDateClient(r.timestamp)
+        : { date: "—", time: "—" };
 
       return {
         date: `${date} ${time}`,
@@ -87,9 +126,23 @@ export default function RecentTransactions() {
         </div>
       </div>
 
+      {!onBsc && (
+        <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
+          Please switch your wallet network to BNB Smart Chain (BSC) to view transactions.
+        </div>
+      )}
+
       {readError && (
-        <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-200">
-          {readError.message}
+        <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
+          <div className="font-semibold">Could not load transactions</div>
+          <div className="mt-1 text-red-200">{humanizeReadError(readError)}</div>
+
+          <details className="mt-2 text-xs text-red-200/80">
+            <summary className="cursor-pointer select-none">Details</summary>
+            <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
+              {extractErrText(readError) || "—"}
+            </div>
+          </details>
         </div>
       )}
 
@@ -131,7 +184,9 @@ export default function RecentTransactions() {
                 View on Explorer <ExternalLink className="w-3.5 h-3.5" />
               </a>
             ) : (
-              <div className="mt-3 text-xs text-gray-500">Explorer not available on this network.</div>
+              <div className="mt-3 text-xs text-gray-500">
+                Explorer not available on this network.
+              </div>
             )}
           </div>
         ))}
@@ -209,7 +264,7 @@ export default function RecentTransactions() {
           </div>
           <div className="flex justify-between">
             <span>Network</span>
-            <span className="text-green-400">{chain?.name ?? "—"}</span>
+            <span className="text-green-400">{onBsc ? (chain?.name ?? "BSC") : "Not on BSC"}</span>
           </div>
         </div>
       </div>

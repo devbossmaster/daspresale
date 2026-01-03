@@ -1,4 +1,3 @@
-// app/dashboard/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -6,24 +5,19 @@ import TokenStats from "@/components/dashboard/TokenStats";
 import TransactionHistory from "@/components/dashboard/TransactionHistory";
 import RaisedFunds from "@/components/dashboard/RaisedFunds";
 import { useAccount, useChainId } from "wagmi";
-import { bsc, hardhat } from "wagmi/chains";
+import { bsc } from "wagmi/chains";
 import { getTokenIcoAddress } from "@/lib/contracts/addresses";
-
-function isSupportedChain(chainId: number) {
-  return chainId === hardhat.id || chainId === bsc.id;
-}
 
 export default function DashboardPage() {
   const chainId = useChainId();
   const { isConnected } = useAccount();
 
-  const supported = isSupportedChain(chainId);
-  const ico = getTokenIcoAddress(chainId);
-  const canUseApp = supported && !!ico;
+  const onBsc = chainId === bsc.id;
+  const ico = onBsc ? getTokenIcoAddress(chainId) : undefined;
+  const canUseApp = isConnected && onBsc && !!ico;
 
   return (
     <div className="space-y-6 md:space-y-8 lg:space-y-10 px-4 sm:px-6">
-      {/* Page Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between pt-4 sm:pt-6">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -31,13 +25,13 @@ export default function DashboardPage() {
               Dashboard
             </h1>
 
-            {!supported && (
+            {!onBsc && (
               <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300">
-                Unsupported network
+                Switch to BSC
               </span>
             )}
 
-            {supported && !ico && (
+            {onBsc && !ico && (
               <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-200">
                 ICO address not configured
               </span>
@@ -73,7 +67,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Top Row - Token Stats + Raised Funds */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
         <div className="lg:col-span-2">
           <TokenStats />
@@ -83,7 +76,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Transactions */}
       <TransactionHistory />
     </div>
   );
