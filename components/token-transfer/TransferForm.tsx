@@ -273,7 +273,7 @@ export default function TransferForm() {
 
       {onBsc && !dashLoading && !tokenIsValid && (
         <div className="mb-5 p-3 rounded-xl border border-amber-800/40 bg-amber-900/20 text-sm text-amber-200">
-          Token address is not available. Set NEXT_PUBLIC_TMSAT_TOKEN_ADDRESS or ensure the presale token is configured.
+          Token address is not available. ensure the presale token is configured.
         </div>
       )}
 

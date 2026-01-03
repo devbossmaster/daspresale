@@ -189,7 +189,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <div className={cn("flex items-center gap-2 transition-all duration-300", isCollapsed && "justify-center w-full")}>
             <div className="relative">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white">
-                S
+                <Link href={"/"}>S</Link>
               </div>
               <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />
             </div>
