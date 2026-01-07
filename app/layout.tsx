@@ -22,7 +22,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className="dark">
       <body className={`${inter.className} bg-[#05030B] text-gray-100 min-h-screen`}>
         <ContextProvider cookies={cookies}>
-          <AppShell>{children}</AppShell>
+          <AppShell>
+            <div className="cutive">{children}</div></AppShell>
         </ContextProvider>
       </body>
     </html>

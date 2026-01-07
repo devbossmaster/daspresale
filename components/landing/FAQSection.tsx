@@ -41,7 +41,7 @@ const FAQSection = () => {
   ];
 
   return (
-    <section id="faq" className="relative py-20 sm:py-28 overflow-hidden">
+    <section id="faq" className="relative cutive py-20 sm:py-28 overflow-hidden">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* header */}
         <div className="text-center mb-14">

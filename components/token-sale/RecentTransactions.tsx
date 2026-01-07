@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { History, CheckCircle, ExternalLink, User } from "lucide-react";
 import { useChainId, useChains } from "wagmi";
 import { bsc } from "wagmi/chains";
@@ -47,11 +47,7 @@ function humanizeReadError(e: any) {
 
   if (!raw) return "Unable to load transactions. Please try again.";
 
-  if (
-    raw.includes("failed to fetch") ||
-    raw.includes("network error") ||
-    raw.includes("http request failed")
-  ) {
+  if (raw.includes("failed to fetch") || raw.includes("network error") || raw.includes("http request failed")) {
     return "Unable to reach the BSC RPC. Please check your connection or RPC URL.";
   }
 
@@ -64,15 +60,44 @@ function humanizeReadError(e: any) {
 
 export default function RecentTransactions() {
   const mounted = useMounted();
-  const { data: dash, error: dashError } = useTokenIcoDashboard();
+
+  /**
+   * Cache dashboard data to avoid flicker / resets on background refetch.
+   */
+  const { data: dashLive, isLoading: dashLoadingLive, error: dashError } = useTokenIcoDashboard();
+  const lastDashRef = useRef<typeof dashLive | undefined>(undefined);
+  useEffect(() => {
+    if (dashLive) lastDashRef.current = dashLive;
+  }, [dashLive]);
+  const dash = dashLive ?? lastDashRef.current;
+  const dashLoading = dashLoadingLive && !dash;
 
   const chainId = useChainId();
   const onBsc = chainId === bsc.id;
 
-  // Avoid scanning when not on BSC
-  const { rows, isLoading, error: logsError } = useRecentPurchases(
-    onBsc ? { limit: 10, blockRange: 50_000n } : { limit: 0 }
-  );
+  /**
+   * Transactions “0 records” is usually because blockRange is too small.
+   * Use a larger blockRange so older purchases are included.
+   * (If you need full history reliably, use an indexer/subgraph.)
+   */
+  const {
+    rows: liveRows,
+    isLoading: logsLoading,
+    error: logsError,
+  } = useRecentPurchases(onBsc ? { limit: 10, blockRange: 500_000n } : { limit: 0 });
+
+  /**
+   * Cache last successful rows so the UI doesn’t show empty during refetch.
+   */
+  const lastRowsRef = useRef<typeof liveRows | undefined>(undefined);
+  useEffect(() => {
+    if (!logsLoading && !logsError && liveRows) lastRowsRef.current = liveRows;
+  }, [liveRows, logsLoading, logsError]);
+
+  const rows = liveRows ?? lastRowsRef.current ?? [];
+
+  // Only show loading on first load (when we have never had rows yet)
+  const isLoading = logsLoading && !lastRowsRef.current;
 
   const tokenSymbol = dash?.symbol ?? "TOKEN";
   const tokenDecimals = dash?.decimals ?? 18;
@@ -82,13 +107,11 @@ export default function RecentTransactions() {
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
 
-  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url ?? "https://bscscan.com" : undefined;
 
   const txs = useMemo(() => {
     return rows.map((r) => {
-      const { date, time } = mounted
-        ? formatDateClient(r.timestamp)
-        : { date: "—", time: "—" };
+      const { date, time } = mounted ? formatDateClient(r.timestamp) : { date: "—", time: "—" };
 
       return {
         date: `${date} ${time}`,
@@ -111,7 +134,12 @@ export default function RecentTransactions() {
     };
   }, [txs.length, rows, tokenDecimals]);
 
+  /**
+   * Avoid flashing errors during background refetch:
+   * show error only if we have no cached rows at all.
+   */
   const readError = dashError || logsError;
+  const showError = !!readError && txs.length === 0;
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-6 lg:p-8">
@@ -132,23 +160,21 @@ export default function RecentTransactions() {
         </div>
       )}
 
-      {readError && (
+      {showError && (
         <div className="mb-5 p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
           <div className="font-semibold">Could not load transactions</div>
           <div className="mt-1 text-red-200">{humanizeReadError(readError)}</div>
 
           <details className="mt-2 text-xs text-red-200/80">
             <summary className="cursor-pointer select-none">Details</summary>
-            <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
-              {extractErrText(readError) || "—"}
-            </div>
+            <div className="mt-2 whitespace-pre-wrap break-words opacity-80">{extractErrText(readError) || "—"}</div>
           </details>
         </div>
       )}
 
       {/* Mobile: card list */}
       <div className="space-y-4 sm:hidden">
-        {!isLoading && txs.length === 0 && (
+        {!isLoading && !showError && txs.length === 0 && (
           <div className="p-4 rounded-xl border border-gray-800 bg-gray-900/60 text-sm text-gray-400">
             No purchases found yet.
           </div>
@@ -184,9 +210,7 @@ export default function RecentTransactions() {
                 View on Explorer <ExternalLink className="w-3.5 h-3.5" />
               </a>
             ) : (
-              <div className="mt-3 text-xs text-gray-500">
-                Explorer not available on this network.
-              </div>
+              <div className="mt-3 text-xs text-gray-500">Explorer not available on this network.</div>
             )}
           </div>
         ))}
@@ -207,7 +231,7 @@ export default function RecentTransactions() {
           </thead>
 
           <tbody className="divide-y divide-gray-800">
-            {!isLoading && txs.length === 0 && (
+            {!isLoading && !showError && txs.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-4 text-sm text-gray-400">
                   No purchases found yet.
@@ -264,7 +288,7 @@ export default function RecentTransactions() {
           </div>
           <div className="flex justify-between">
             <span>Network</span>
-            <span className="text-green-400">{onBsc ? (chain?.name ?? "BSC") : "Not on BSC"}</span>
+            <span className="text-green-400">{onBsc ? chain?.name ?? "BSC" : "Not on BSC"}</span>
           </div>
         </div>
       </div>

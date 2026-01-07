@@ -1,6 +1,6 @@
 // app/token-transfer/page.tsx
-import TransferForm from "@/components/token-transfer/TransferForm";
-import RecentTransfers from "@/components/token-transfer/RecentTransfers";
+import TransferForm from "@/components/token-transfers/TransferForm";
+import RecentTransfers from "@/components/token-transfers/RecentTransfers";
 
 export default function TokenTransferPage() {
   return (
@@ -17,9 +17,6 @@ export default function TokenTransferPage() {
 
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8">
-        <div className="xl:col-span-2">
-          <TransferForm />
-        </div>
 
         <div className="xl:col-span-1">
           <RecentTransfers />

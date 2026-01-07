@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react'
 import { Package, History, Wallet } from 'lucide-react'
 import AssetsTab from '@/components/user-dashboard/AssetsTab'
-import TransactionsTab from '@/components/user-dashboard/TransactionsTab'
 import OverviewTab from '@/components/user-dashboard/OverviewTab'
 
 type TabId = 'overview' | 'assets' | 'transactions'
@@ -11,7 +10,6 @@ type TabId = 'overview' | 'assets' | 'transactions'
 const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'overview', label: 'Overview', icon: Package },
   { id: 'assets', label: 'Assets', icon: Wallet },
-  { id: 'transactions', label: 'Transactions', icon: History },
 ]
 
 export default function UserDashboardPage() {
@@ -19,8 +17,7 @@ export default function UserDashboardPage() {
 
   const Active = useMemo(() => {
     if (activeTab === 'overview') return OverviewTab
-    if (activeTab === 'assets') return AssetsTab
-    return TransactionsTab
+    return AssetsTab
   }, [activeTab])
 
   return (

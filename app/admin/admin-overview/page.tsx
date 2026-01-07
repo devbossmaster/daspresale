@@ -5,14 +5,27 @@ import {
   Settings,
   DollarSign,
   Package,
-  Eye,
   Link as LinkIcon,
-  Calendar,
   Wallet,
   Copy,
   ExternalLink,
   PauseCircle,
   PlayCircle,
+  RefreshCw,
+  AlertCircle,
+  Shield,
+  Clock,
+  TrendingUp,
+  Users,
+  ChevronRight,
+  CheckCircle,
+  XCircle,
+  BarChart3,
+  ShieldCheck,
+  Cpu,
+  Network,
+  Loader2,
+  Info,
 } from "lucide-react";
 import {
   useAccount,
@@ -27,247 +40,229 @@ import { isAddress, parseUnits } from "viem";
 
 import { getTokenIcoAddress } from "@/lib/contracts/addresses";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
+import { useMounted } from "@/lib/hooks/useMounted";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
-
-const ownerAbi = [
-  {
-    type: "function",
-    name: "owner",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "address" }],
-  },
-] as const;
-
-const adminWriteAbi = [
-  {
-    type: "function",
-    name: "setSaleToken",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "_token", type: "address" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "updateTokenPrice",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "newPrice", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "pause",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "unpause",
-    stateMutability: "nonpayable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "setSaleWindow",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "start", type: "uint64" },
-      { name: "end", type: "uint64" },
-    ],
-    outputs: [],
-  },
-] as const;
-
-const adminSections = [
-  { id: "overview", label: "Overview", icon: Eye },
-  { id: "token-config", label: "Token Config", icon: Settings },
-  { id: "price-settings", label: "Price Settings", icon: DollarSign },
-  { id: "sale-controls", label: "Sale Controls", icon: PauseCircle },
-] as const;
-
-type SectionId = (typeof adminSections)[number]["id"];
 
 function shortAddr(a?: string) {
   if (!a) return "—";
   return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
 
-async function copyText(txt: string) {
-  try {
-    await navigator.clipboard.writeText(txt);
-  } catch {
-    // Clipboard can fail (permissions/browser); handle via UI message where called
-    throw new Error("Copy failed. Please copy manually.");
-  }
-}
-
-function fmtDateTime(ts?: number) {
+function formatTimeAgo(ts?: number) {
   if (!ts) return "—";
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - ts;
+  
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  
   const d = new Date(ts * 1000);
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function safeToUint64(s: string) {
-  const n = Number(s.trim());
-  if (!Number.isFinite(n) || n < 0) return null;
-  if (n > Number.MAX_SAFE_INTEGER) return null;
-  return BigInt(Math.floor(n));
-}
-
-function extractErrText(e: any) {
-  return e?.shortMessage || e?.cause?.shortMessage || e?.details || e?.message || "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function humanizeTxError(e: any) {
-  const raw = String(extractErrText(e) || "").toLowerCase();
-  if (!raw) return "Transaction failed. Please try again.";
-  if (raw.includes("user rejected") || raw.includes("rejected the request"))
+  const msg = e?.shortMessage || e?.cause?.shortMessage || e?.message || "";
+  const s = String(msg).toLowerCase();
+  
+  if (s.includes("user rejected") || s.includes("rejected the request"))
     return "Transaction was cancelled in your wallet.";
-  if (raw.includes("insufficient funds"))
-    return "Insufficient funds to pay gas for this transaction.";
-  if (raw.includes("nonce"))
-    return "Nonce issue detected. Please retry, or reset your wallet nonce if needed.";
-  if (raw.includes("network") || raw.includes("chain"))
-    return "Network error. Please ensure your wallet is connected to BNB Smart Chain (BSC).";
+  if (s.includes("insufficient funds"))
+    return "Insufficient funds to pay gas.";
+  if (s.includes("execution reverted"))
+    return "Transaction reverted by contract.";
+  if (s.includes("network") || s.includes("chain"))
+    return "Network error. Please connect to BNB Smart Chain.";
   return "Transaction failed. Please try again.";
 }
 
-function humanizeReadError(e: any) {
-  const raw = String(extractErrText(e) || "").toLowerCase();
-  if (!raw) return "Unable to load contract data. Please try again.";
-  if (raw.includes("network") || raw.includes("chain"))
-    return "Network error. Please ensure your wallet is connected to BNB Smart Chain (BSC).";
-  if (raw.includes("timeout")) return "Request timed out. Please try again.";
-  return "Unable to load contract data. Please try again.";
+// Fixed: USDT has 6 decimals, not 18
+function formatUsdtAmount(amount: bigint, decimals: number = 6): string {
+  if (amount === 0n) return "0.0";
+  
+  const value = Number(amount) / 10 ** decimals;
+  
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}K`;
+  }
+  
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  });
 }
 
+function formatTokens(amount: bigint, decimals: number = 18): string {
+  if (amount === 0n) return "0";
+  const value = Number(amount) / 10 ** decimals;
+  
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(2)}M`;
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)}K`;
+  }
+  
+  return value.toLocaleString('en-US', { 
+    maximumFractionDigits: 2 
+  });
+}
+
+const adminSections = [
+  { id: "overview", label: "Dashboard", icon: BarChart3 },
+  { id: "token-config", label: "Token Setup", icon: ShieldCheck },
+  { id: "price-settings", label: "Price Settings", icon: DollarSign },
+  { id: "sale-controls", label: "Sale Controls", icon: Cpu },
+] as const;
+
+type SectionId = typeof adminSections[number]["id"];
+
 export default function AdminPage() {
+  const mounted = useMounted();
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
+  
+  const [cachedDashboard, setCachedDashboard] = useState<any>(null);
+  const [cachedOwner, setCachedOwner] = useState<`0x${string}` | null>(null);
+  const [hasInitialData, setHasInitialData] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
 
   const chainId = useChainId();
   const onBsc = chainId === bsc.id;
-
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
-  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
+  const { address: user } = useAccount();
 
   const ico = getTokenIcoAddress(chainId);
   const publicClient = usePublicClient();
-  const { address: user } = useAccount();
+  const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
-  const {
-    data: dash,
-    isLoading: dashLoading,
-    error: dashError,
+  const { 
+    data: dashLive, 
+    isLoading: dashLoadingLive, 
+    refetch: refetchDashboard 
   } = useTokenIcoDashboard();
 
-  // Owner
-  const owner = useReadContract({
+  useEffect(() => {
+    if (dashLive && !dashLoadingLive) {
+      setCachedDashboard(dashLive);
+      setHasInitialData(true);
+      setLastUpdate(Date.now());
+    }
+  }, [dashLive, dashLoadingLive]);
+
+  const dash = hasInitialData ? (dashLive || cachedDashboard) : dashLive;
+  const dashLoading = dashLoadingLive && !hasInitialData;
+
+  const ownerRead = useReadContract({
     address: onBsc ? ico : undefined,
-    abi: ownerAbi,
+    abi: [{ type: "function", name: "owner", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] }],
     functionName: "owner",
-    query: { enabled: !!ico && onBsc, refetchInterval: 8_000 },
+    query: { 
+      enabled: !!ico && onBsc, 
+      staleTime: 10000,
+    },
   });
 
-  const ownerAddr = owner.data as `0x${string}` | undefined;
+  useEffect(() => {
+    if (ownerRead.data && !ownerRead.isLoading) {
+      setCachedOwner(ownerRead.data as `0x${string}`);
+    }
+  }, [ownerRead.data, ownerRead.isLoading]);
 
+  const ownerAddr = hasInitialData ? (ownerRead.data || cachedOwner) : ownerRead.data;
   const isOwner = useMemo(() => {
     if (!user || !ownerAddr) return false;
     return user.toLowerCase() === ownerAddr.toLowerCase();
   }, [user, ownerAddr]);
 
-  // Latest block timestamp (Last updated)
-  const [lastUpdated, setLastUpdated] = useState<number | undefined>(undefined);
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (!publicClient || !onBsc) return;
-      try {
-        const b = await publicClient.getBlock();
-        if (!cancelled) setLastUpdated(Number(b.timestamp));
-      } catch {
-        // ignore
-      }
-    }
-
-    run();
-    const t = setInterval(run, 12_000);
-    return () => {
-      cancelled = true;
-      clearInterval(t);
-    };
-  }, [publicClient, onBsc]);
-
-  // UI feedback
   const [uiError, setUiError] = useState<string | null>(null);
-  const [uiErrorDetails, setUiErrorDetails] = useState<string | null>(null);
   const [uiSuccess, setUiSuccess] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [lastTx, setLastTx] = useState<`0x${string}` | null>(null);
 
-  const [showDashDetails, setShowDashDetails] = useState(false);
-  const [showUiDetails, setShowUiDetails] = useState(false);
+  const [saleTokenInput, setSaleTokenInput] = useState("");
+  const [priceInput, setPriceInput] = useState("");
+  const [startInput, setStartInput] = useState<string>("");
+  const [endInput, setEndInput] = useState<string>("");
 
   const { writeContractAsync, isPending } = useWriteContract();
 
+  const saleTokenAlreadySet = useMemo(() => {
+    const t = dash?.tokenAddr as `0x${string}` | undefined;
+    return !!t && t !== ZERO_ADDRESS;
+  }, [dash?.tokenAddr]);
+
+  const saleSymbol = dash?.symbol ?? "TOKEN";
+  const payDecimals = dash?.payDecimals ?? 6; // Fixed: USDT has 6 decimals
+  const paySymbol = dash?.paySymbol ?? "USDT";
+  const isPaused = dash?.paused ?? false;
+  const usdtRaised = dash?.usdtRaised ?? 0n;
+  const tokensRemaining = dash?.tokensRemaining ?? 0n;
+  const currentPrice = dash?.priceUsdt ?? "0";
+
+  const usdtRaisedFormatted = useMemo(() => {
+    return formatUsdtAmount(usdtRaised, 18); // Fixed: 6 decimals for USDT
+  }, [usdtRaised]);
+
+  const tokensRemainingFormatted = useMemo(() => {
+    return formatTokens(tokensRemaining, 18);
+  }, [tokensRemaining]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.allSettled([
+        refetchDashboard?.(),
+        ownerRead.refetch?.(),
+      ]);
+      setLastUpdate(Date.now());
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
   function resetNotices() {
     setUiError(null);
-    setUiErrorDetails(null);
     setUiSuccess(null);
     setLastTx(null);
-    setShowUiDetails(false);
   }
 
-  async function runWrite(label: string, args: Parameters<typeof writeContractAsync>[0]) {
+  async function runWrite(label: string, args: any) {
     resetNotices();
 
     try {
-      if (!onBsc) throw new Error("Please switch your wallet network to BNB Smart Chain (BSC).");
-      if (!ico) throw new Error("ICO address is not configured for this chain.");
-      if (!isOwner) throw new Error("Only the contract owner can perform this action.");
+      if (!onBsc) throw new Error("Please switch to BNB Smart Chain.");
+      if (!ico) throw new Error("ICO address not configured.");
+      if (!isOwner) throw new Error("Only contract owner can perform this action.");
       if (!publicClient) throw new Error("Public client not ready.");
 
       const hash = await writeContractAsync(args);
       setLastTx(hash);
 
       await publicClient.waitForTransactionReceipt({ hash });
-      setUiSuccess(`${label} confirmed on-chain.`);
+      setUiSuccess(`${label} successful!`);
+      
+      handleRefresh();
     } catch (e: any) {
-      const details = extractErrText(e);
       setUiError(humanizeTxError(e));
-      setUiErrorDetails(details || null);
     }
   }
-
-  // ===== Token Config =====
-  const [saleTokenInput, setSaleTokenInput] = useState("");
-  const saleTokenAlreadySet = useMemo(() => {
-    const t = dash?.tokenAddr as `0x${string}` | undefined;
-    return !!t && t !== ZERO_ADDRESS;
-  }, [dash?.tokenAddr]);
 
   async function onSetSaleToken() {
     const addr = saleTokenInput.trim();
     if (!isAddress(addr)) {
-      setUiError("Invalid sale token address.");
-      setUiErrorDetails(null);
+      setUiError("Invalid token address.");
       return;
     }
 
-    await runWrite("Set sale token", {
+    await runWrite("Token set", {
       address: ico!,
-      abi: adminWriteAbi,
+      abi: [{ type: "function", name: "setSaleToken", stateMutability: "nonpayable", inputs: [{ name: "_token", type: "address" }], outputs: [] }],
       functionName: "setSaleToken",
       args: [addr as `0x${string}`],
     });
@@ -275,16 +270,10 @@ export default function AdminPage() {
     setSaleTokenInput("");
   }
 
-  // ===== Price Settings =====
-  const payDecimals = dash?.payDecimals ?? 18;
-  const paySymbol = dash?.paySymbol ?? "USDT";
-
-  const [priceInput, setPriceInput] = useState(""); // "0.01"
   async function onUpdatePrice() {
     const v = priceInput.trim();
     if (!v || Number(v) <= 0) {
       setUiError("Enter a valid price greater than 0.");
-      setUiErrorDetails(null);
       return;
     }
 
@@ -292,14 +281,13 @@ export default function AdminPage() {
     try {
       newPrice = parseUnits(v.replace(/,/g, ""), payDecimals);
     } catch {
-      setUiError(`Invalid number format. Max decimals for ${paySymbol}: ${payDecimals}.`);
-      setUiErrorDetails(null);
+      setUiError(`Invalid number format. Max decimals: ${payDecimals}.`);
       return;
     }
 
-    await runWrite("Update token price", {
+    await runWrite("Price updated", {
       address: ico!,
-      abi: adminWriteAbi,
+      abi: [{ type: "function", name: "updateTokenPrice", stateMutability: "nonpayable", inputs: [{ name: "newPrice", type: "uint256" }], outputs: [] }],
       functionName: "updateTokenPrice",
       args: [newPrice],
     });
@@ -307,654 +295,900 @@ export default function AdminPage() {
     setPriceInput("");
   }
 
-  // ===== Sale Controls =====
-  const isPaused = dash?.paused ?? false;
-  const [startInput, setStartInput] = useState<string>("");
-  const [endInput, setEndInput] = useState<string>("");
-
-  useEffect(() => {
-    if (dash?.start !== undefined) setStartInput(String(dash.start));
-    if (dash?.end !== undefined) setEndInput(String(dash.end));
-  }, [dash?.start, dash?.end]);
-
-  const saleWindowEnabled = useMemo(() => {
-    const s = dash?.start ?? 0;
-    const e = dash?.end ?? 0;
-    return s !== 0 || e !== 0;
-  }, [dash?.start, dash?.end]);
-
   async function onPause() {
-    await runWrite("Pause sale", {
+    await runWrite("Sale paused", {
       address: ico!,
-      abi: adminWriteAbi,
+      abi: [{ type: "function", name: "pause", stateMutability: "nonpayable", inputs: [], outputs: [] }],
       functionName: "pause",
       args: [],
     });
   }
 
   async function onUnpause() {
-    await runWrite("Unpause sale", {
+    await runWrite("Sale unpaused", {
       address: ico!,
-      abi: adminWriteAbi,
+      abi: [{ type: "function", name: "unpause", stateMutability: "nonpayable", inputs: [], outputs: [] }],
       functionName: "unpause",
       args: [],
     });
   }
 
   async function onSetSaleWindow() {
-    const s = safeToUint64(startInput);
-    const e = safeToUint64(endInput);
+    const s = BigInt(startInput.trim() || "0");
+    const e = BigInt(endInput.trim() || "0");
 
-    if (s === null || e === null) {
-      setUiError("Invalid start/end unix seconds.");
-      setUiErrorDetails(null);
+    if (s === 0n && e === 0n) {
+      await runWrite("Sale window disabled", {
+        address: ico!,
+        abi: [{ type: "function", name: "setSaleWindow", stateMutability: "nonpayable", inputs: [{ name: "start", type: "uint64" }, { name: "end", type: "uint64" }], outputs: [] }],
+        functionName: "setSaleWindow",
+        args: [s, e],
+      });
       return;
     }
 
-    const disabled = s === 0n && e === 0n;
-    if (!disabled) {
-      if (s === 0n || e === 0n || s >= e) {
-        setUiError("Invalid sale window. Use (start < end), or set both to 0 to disable.");
-        setUiErrorDetails(null);
-        return;
-      }
+    if (s >= e) {
+      setUiError("End time must be greater than start time.");
+      return;
     }
 
-    await runWrite("Update sale window", {
+    await runWrite("Sale window updated", {
       address: ico!,
-      abi: adminWriteAbi,
+      abi: [{ type: "function", name: "setSaleWindow", stateMutability: "nonpayable", inputs: [{ name: "start", type: "uint64" }, { name: "end", type: "uint64" }], outputs: [] }],
       functionName: "setSaleWindow",
       args: [s, e],
     });
   }
 
-  async function onDisableSaleWindow() {
-    setStartInput("0");
-    setEndInput("0");
-    await runWrite("Disable sale window", {
-      address: ico!,
-      abi: adminWriteAbi,
-      functionName: "setSaleWindow",
-      args: [0n, 0n],
-    });
-  }
-
-  const saleSymbol = dash?.symbol ?? "TOKEN";
-  const tokensRemainingHuman = dash?.tokensRemainingHuman ?? "—";
-  const totalTokensSoldHuman = dash?.totalTokensSoldHuman ?? "—";
+  useEffect(() => {
+    if (dash?.start !== undefined) setStartInput(String(dash.start));
+    if (dash?.end !== undefined) setEndInput(String(dash.end));
+  }, [dash?.start, dash?.end]);
 
   const txUrl = lastTx && explorerBase ? `${explorerBase}/tx/${lastTx}` : null;
 
-  const dashDetails = dashError ? extractErrText(dashError as any) : null;
-  const dashMsg = dashError ? humanizeReadError(dashError as any) : null;
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full min-h-screen bg-transparent text-white space-y-8 px-4 sm:px-6 lg:px-8 pt-6 pb-10">
-      {/* Header */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-2">Admin</h1>
-        <p className="text-gray-400">Administrator dashboard for managing sale settings</p>
-
-        <div className="mt-2 text-xs text-gray-500">
-          Connected: <span className="font-mono">{user ? shortAddr(user) : "—"}</span>{" "}
-          {isOwner ? (
-            <span className="text-emerald-400">(Owner)</span>
-          ) : (
-            <span className="text-yellow-400">(Not owner)</span>
-          )}
-        </div>
-
-        {!onBsc && (
-          <div className="mt-3 text-xs sm:text-sm text-amber-200 bg-amber-900/20 border border-amber-800/30 rounded-xl px-3 py-2 inline-block">
-            Please switch your wallet network to BNB Smart Chain (BSC) to use Admin.
-          </div>
-        )}
-
-        {onBsc && !ico && (
-          <div className="mt-3 text-xs sm:text-sm text-red-200 bg-red-900/20 border border-red-800/30 rounded-xl px-3 py-2 inline-block">
-            ICO address is not configured for this network.
-          </div>
-        )}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 -left-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-40 right-1/4 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl"></div>
       </div>
 
-      {/* Notices */}
-      {(dashError || uiError || uiSuccess) && (
-        <div className="max-w-3xl mx-auto space-y-3">
-          {dashError && (
-            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
-              <div className="font-semibold">Unable to load contract data</div>
-              <div className="mt-1 text-red-200">{dashMsg}</div>
-
-              {dashDetails && (
-                <button
-                  type="button"
-                  onClick={() => setShowDashDetails((v) => !v)}
-                  className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
-                >
-                  {showDashDetails ? "Hide details" : "Show details"}
-                </button>
-              )}
-
-              {showDashDetails && dashDetails && (
-                <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
-                  {dashDetails}
-                </div>
-              )}
-            </div>
-          )}
-
-          {uiError && (
-            <div className="p-3 rounded-xl border border-red-800/40 bg-red-900/20 text-sm text-red-100">
-              <div className="font-semibold">Action failed</div>
-              <div className="mt-1 text-red-200">{uiError}</div>
-
-              {uiErrorDetails && (
-                <button
-                  type="button"
-                  onClick={() => setShowUiDetails((v) => !v)}
-                  className="mt-2 text-xs text-red-200/80 hover:text-red-100 underline underline-offset-2"
-                >
-                  {showUiDetails ? "Hide details" : "Show details"}
-                </button>
-              )}
-
-              {showUiDetails && uiErrorDetails && (
-                <div className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words">
-                  {uiErrorDetails}
-                </div>
-              )}
-            </div>
-          )}
-
-          {uiSuccess && (
-            <div className="p-3 rounded-xl border border-emerald-800/40 bg-emerald-900/15 text-sm text-emerald-200">
-              {uiSuccess}
-              {txUrl && (
-                <div className="mt-2">
-                  <a
-                    href={txUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-cyan-300 hover:text-cyan-200 text-sm"
-                  >
-                    View transaction <ExternalLink className="w-4 h-4" />
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Nav Tabs (responsive scroll) */}
-      <div className="flex justify-center">
-        <div className="w-full max-w-4xl overflow-x-auto">
-          <div className="inline-flex min-w-max bg-gray-900 border border-gray-800 rounded-2xl p-1 gap-1">
-            {adminSections.map((section) => {
-              const Icon = section.icon;
-              const isActive = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => {
-                    resetNotices();
-                    setActiveSection(section.id);
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
-                    isActive
-                      ? "bg-gradient-to-r from-cyan-600/30 to-purple-600/30 text-white border border-cyan-500/40"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{section.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex flex-col lg:flex-row gap-6 justify-center items-start">
-        {/* Left Column */}
-        <div className="flex-1 w-full max-w-3xl space-y-6">
-          {activeSection === "overview" && (
-            <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-cyan-900/30 rounded-lg">
-                  <Eye className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Overview</h2>
-                  <p className="text-gray-400 text-sm">Live contract summary</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-cyan-900/30 rounded-lg">
-                      <Package className="w-4 h-4 text-cyan-400" />
-                    </div>
-                    <span className="text-gray-400 text-sm">Sale Token Remaining</span>
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {dashLoading ? "Loading..." : `${tokensRemainingHuman} ${saleSymbol}`}
-                  </div>
-                </div>
-
-                <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-purple-900/30 rounded-lg">
-                      <DollarSign className="w-4 h-4 text-purple-400" />
-                    </div>
-                    <span className="text-gray-400 text-sm">Total Tokens Sold</span>
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {dashLoading ? "Loading..." : `${totalTokensSoldHuman} ${saleSymbol}`}
-                  </div>
-                </div>
-
-                <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-green-900/30 rounded-lg">
-                      <LinkIcon className="w-4 h-4 text-green-400" />
-                    </div>
-                    <span className="text-gray-400 text-sm">Contract Address</span>
-                  </div>
-
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="font-mono font-bold text-sm break-all">{ico ?? "—"}</div>
-                    <div className="flex gap-2 shrink-0">
-                      {ico && (
-                        <button
-                          className="p-2 hover:bg-gray-700 rounded-lg"
-                          onClick={async () => {
-                            try {
-                              await copyText(ico);
-                              setCopied("ico");
-                              setTimeout(() => setCopied(null), 1200);
-                            } catch (e: any) {
-                              setUiError(e?.message ?? "Copy failed.");
-                              setUiErrorDetails(null);
-                            }
-                          }}
-                          title="Copy"
-                          type="button"
-                        >
-                          <Copy className="w-4 h-4 text-gray-400" />
-                        </button>
-                      )}
-                      {ico && explorerBase && (
-                        <a
-                          className="p-2 hover:bg-gray-700 rounded-lg"
-                          href={`${explorerBase}/address/${ico}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open in explorer"
-                        >
-                          <ExternalLink className="w-4 h-4 text-gray-400" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {copied === "ico" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
-                </div>
-
-                <div className="p-5 bg-gray-800/40 rounded-xl border border-gray-800">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-orange-900/30 rounded-lg">
-                      <Wallet className="w-4 h-4 text-orange-400" />
-                    </div>
-                    <span className="text-gray-400 text-sm">Owner (Admin)</span>
-                  </div>
-
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="font-mono font-bold text-sm break-all">
-                      {ownerAddr ?? (owner.isLoading ? "Loading..." : "—")}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {ownerAddr && (
-                        <button
-                          className="p-2 hover:bg-gray-700 rounded-lg"
-                          onClick={async () => {
-                            try {
-                              await copyText(ownerAddr);
-                              setCopied("owner");
-                              setTimeout(() => setCopied(null), 1200);
-                            } catch (e: any) {
-                              setUiError(e?.message ?? "Copy failed.");
-                              setUiErrorDetails(null);
-                            }
-                          }}
-                          title="Copy"
-                          type="button"
-                        >
-                          <Copy className="w-4 h-4 text-gray-400" />
-                        </button>
-                      )}
-                      {ownerAddr && explorerBase && (
-                        <a
-                          className="p-2 hover:bg-gray-700 rounded-lg"
-                          href={`${explorerBase}/address/${ownerAddr}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open in explorer"
-                        >
-                          <ExternalLink className="w-4 h-4 text-gray-400" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {copied === "owner" && <div className="mt-2 text-xs text-emerald-300">Copied.</div>}
-                </div>
-              </div>
-
-              <div className="pt-4 mt-6 border-t border-gray-800 text-gray-400 text-sm flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>Last updated: {fmtDateTime(lastUpdated)}</span>
-              </div>
-            </div>
-          )}
-
-          {activeSection === "token-config" && (
-            <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-cyan-900/30 rounded-lg">
-                  <Settings className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Token Configuration</h2>
-                  <p className="text-gray-400 text-sm">Set the sale token (one-time)</p>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="text-xs text-gray-400">
-                  Current sale token:{" "}
-                  <span className="font-mono text-gray-200">
-                    {saleTokenAlreadySet ? shortAddr(dash?.tokenAddr) : "Not set"}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-gray-400 text-sm mb-2 block">Token Address</label>
-                  <input
-                    type="text"
-                    placeholder="0x..."
-                    value={saleTokenInput}
-                    onChange={(e) => setSaleTokenInput(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  />
-                </div>
-
-                <button
-                  disabled={!onBsc || !ico || !isOwner || isPending || saleTokenAlreadySet}
-                  onClick={onSetSaleToken}
-                  className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
-                    !onBsc || !ico || !isOwner || isPending || saleTokenAlreadySet
-                      ? "bg-gray-700 text-gray-300 cursor-not-allowed"
-                      : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
-                  }`}
-                  type="button"
-                >
-                  {saleTokenAlreadySet
-                    ? "Sale Token Already Set"
-                    : isPending
-                      ? "Submitting..."
-                      : "Set Sale Token"}
-                </button>
-
-                {!isOwner && (
-                  <div className="text-xs text-yellow-400">Only the contract owner can set the sale token.</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeSection === "price-settings" && (
-            <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-purple-900/30 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-purple-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Price Settings</h2>
-                  <p className="text-gray-400 text-sm">
-                    Update token price ({paySymbol} per 1 token). Decimals: {payDecimals}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-5">
-                <div className="text-xs text-gray-400">
-                  Current price:{" "}
-                  <span className="text-gray-200 font-semibold">
-                    {dashLoading ? "Loading..." : dash?.priceUsdt ? `${dash.priceUsdt} ${paySymbol}` : "—"}
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-gray-400 text-sm mb-2 block">
-                    New Price ({paySymbol} per token)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={priceInput}
-                      onChange={(e) => setPriceInput(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 text-2xl font-bold text-right focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                      {paySymbol}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  disabled={!onBsc || !ico || !isOwner || isPending || !saleTokenAlreadySet}
-                  onClick={onUpdatePrice}
-                  className={`w-full py-3 rounded-xl font-bold transition-all duration-200 ${
-                    !onBsc || !ico || !isOwner || isPending || !saleTokenAlreadySet
-                      ? "bg-gray-700 text-gray-300 cursor-not-allowed"
-                      : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
-                  }`}
-                  type="button"
-                >
-                  {isPending ? "Submitting..." : "Update Token Price"}
-                </button>
-
-                {!saleTokenAlreadySet && (
-                  <div className="text-xs text-yellow-400">
-                    You must set the sale token before updating the price.
-                  </div>
-                )}
-                {!isOwner && (
-                  <div className="text-xs text-yellow-400">Only the contract owner can update the price.</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeSection === "sale-controls" && (
-            <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-cyan-900/30 rounded-lg">
-                  <PauseCircle className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Sale Controls</h2>
-                  <p className="text-gray-400 text-sm">Pause/unpause and configure the sale window</p>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="p-4 rounded-xl border border-gray-800 bg-gray-800/30 flex items-center justify-between">
-                  <div>
-                    <div className="text-xs text-gray-400">Status</div>
-                    <div className="mt-1 text-lg font-bold">{dashLoading ? "Loading..." : isPaused ? "Paused" : "Live"}</div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      Sale window:{" "}
-                      {dashLoading ? "—" : saleWindowEnabled ? "Enabled" : "Disabled (always open)"}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      disabled={!onBsc || !ico || !isOwner || isPending || dashLoading || isPaused}
-                      onClick={onPause}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
-                        !onBsc || !ico || !isOwner || isPending || dashLoading || isPaused
-                          ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
-                          : "bg-red-900/20 text-red-200 border-red-800/40 hover:bg-red-900/30"
-                      }`}
-                      type="button"
-                    >
-                      <PauseCircle className="w-4 h-4" />
-                      Pause
-                    </button>
-
-                    <button
-                      disabled={!onBsc || !ico || !isOwner || isPending || dashLoading || !isPaused}
-                      onClick={onUnpause}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
-                        !onBsc || !ico || !isOwner || isPending || dashLoading || !isPaused
-                          ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
-                          : "bg-emerald-900/15 text-emerald-200 border-emerald-800/40 hover:bg-emerald-900/25"
-                      }`}
-                      type="button"
-                    >
-                      <PlayCircle className="w-4 h-4" />
-                      Unpause
-                    </button>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl border border-gray-800 bg-gray-800/30 space-y-4">
-                  <div className="text-sm font-semibold">Sale Window (unix seconds)</div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-gray-400">Start</label>
-                      <input
-                        value={startInput}
-                        onChange={(e) => setStartInput(e.target.value)}
-                        className="mt-1 w-full px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400">End</label>
-                      <input
-                        value={endInput}
-                        onChange={(e) => setEndInput(e.target.value)}
-                        className="mt-1 w-full px-4 py-2.5 rounded-xl bg-gray-900 border border-gray-700 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-gray-500">
-                    Use <span className="text-gray-300 font-mono">start=0</span> and{" "}
-                    <span className="text-gray-300 font-mono">end=0</span> to disable the window (always open).
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      disabled={!onBsc || !ico || !isOwner || isPending}
-                      onClick={onSetSaleWindow}
-                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
-                        !onBsc || !ico || !isOwner || isPending
-                          ? "bg-gray-700 text-gray-300 cursor-not-allowed"
-                          : "bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500"
-                      }`}
-                      type="button"
-                    >
-                      {isPending ? "Submitting..." : "Update Window"}
-                    </button>
-
-                    <button
-                      disabled={!onBsc || !ico || !isOwner || isPending}
-                      onClick={onDisableSaleWindow}
-                      className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
-                        !onBsc || !ico || !isOwner || isPending
-                          ? "bg-gray-700 text-gray-300 border-gray-700 cursor-not-allowed"
-                          : "bg-gray-900 text-gray-200 border-gray-700 hover:bg-gray-800"
-                      }`}
-                      type="button"
-                    >
-                      Disable Window
-                    </button>
-                  </div>
-                </div>
-
-                {!isOwner && (
-                  <div className="text-xs text-yellow-400">
-                    Sale controls are restricted to the contract owner.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="w-full max-w-sm lg:sticky lg:top-6">
-          <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6 space-y-5">
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-cyan-900/20 to-purple-900/20 rounded-xl border border-cyan-800/30">
-              <div className="w-10 h-10 bg-cyan-900/30 rounded-lg flex items-center justify-center">
-                <Settings className="w-5 h-5 text-cyan-400" />
-              </div>
+      <div className="relative z-10">
+        <div className="border-b border-white/10 backdrop-blur-xl bg-gradient-to-r from-gray-900/80 to-black/80 sticky top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="font-bold">{isOwner ? "Connected as Admin" : "Connected"}</div>
-                <div className="text-sm text-gray-400">{isOwner ? "Administrator Mode" : "Read-only Mode"}</div>
+                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-gray-400 mt-1">
+                  Manage presale settings and monitor contract activity
+                </p>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-400 hidden sm:block">
+                  Last updated: {formatTimeAgo(Math.floor(lastUpdate / 1000))}
+                </div>
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-xl flex items-center gap-2 transition-all duration-200 border border-gray-800 hover:border-gray-700"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="p-4 bg-gray-800/30 rounded-xl">
-              <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
-                <Calendar className="w-4 h-4" />
-                <span>Last update:</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-4 mb-8">
+            {!onBsc && (
+              <div className="rounded-xl border border-amber-800/40 bg-gradient-to-r from-amber-900/20 to-orange-900/10 p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-900/30 rounded-lg">
+                    <Network className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-amber-200">Switch Network</div>
+                    <div className="text-sm text-amber-300/80">
+                      Please switch to BNB Smart Chain to access admin controls
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="font-mono text-sm">{fmtDateTime(lastUpdated)}</div>
-            </div>
-
-            <div className="p-4 bg-gray-800/20 rounded-xl text-xs sm:text-sm text-gray-400 space-y-2">
-              <div className="flex justify-between">
-                <span>Network</span>
-                <span className="text-gray-200">{chain?.name ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>ICO</span>
-                <span className="font-mono text-gray-200">{ico ? shortAddr(ico) : "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Sale Token</span>
-                <span className="font-mono text-gray-200">
-                  {dash?.tokenAddr ? shortAddr(dash.tokenAddr) : "—"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Payment</span>
-                <span className="text-gray-200">{paySymbol}</span>
-              </div>
-            </div>
-
-            {explorerBase && ico && (
-              <a
-                href={`${explorerBase}/address/${ico}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-bold text-gray-200"
-              >
-                Open Contract <ExternalLink className="w-4 h-4" />
-              </a>
             )}
+
+            {onBsc && !isOwner && user && (
+              <div className="rounded-xl border border-amber-800/40 bg-gradient-to-r from-amber-900/20 to-orange-900/10 p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-900/30 rounded-lg">
+                    <Shield className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-amber-200">Read-Only Access</div>
+                    <div className="text-sm text-amber-300/80">
+                      Connected wallet is not the contract owner. You can view data but cannot make changes.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {uiError && (
+              <div className="rounded-xl border border-red-800/40 bg-gradient-to-r from-red-900/20 to-pink-900/10 p-4 backdrop-blur-sm">
+                <div className="flex items-start gap-3">
+                  <XCircle className="w-5 h-5 text-red-400 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-medium text-red-200">Transaction Failed</div>
+                    <div className="text-sm text-red-300/80">{uiError}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {uiSuccess && (
+              <div className="rounded-xl border border-emerald-800/40 bg-gradient-to-r from-emerald-900/20 to-green-900/10 p-4 backdrop-blur-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                    <div>
+                      <div className="font-medium text-emerald-200">Success!</div>
+                      <div className="text-sm text-emerald-300/80">{uiSuccess}</div>
+                    </div>
+                  </div>
+                  {txUrl && (
+                    <a href={txUrl} target="_blank" rel="noreferrer" className="text-cyan-300 hover:text-cyan-200 text-sm flex items-center gap-2">
+                      View <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="lg:w-64">
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-xl p-5">
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-blue-900/20 to-cyan-900/10 border border-blue-800/30">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center">
+                      <ShieldCheck className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white">Admin Panel</div>
+                      <div className={`text-xs ${isOwner ? 'text-emerald-400' : 'text-amber-400'}`}>
+                        {isOwner ? 'Owner Access' : 'Read-Only Mode'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {adminSections.map((section) => {
+                    const Icon = section.icon;
+                    const isActive = activeSection === section.id;
+                    return (
+                      <button
+                        key={section.id}
+                        onClick={() => {
+                          resetNotices();
+                          setActiveSection(section.id);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="font-medium">{section.label}</span>
+                        {isActive && (
+                          <ChevronRight className="w-4 h-4 ml-auto" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-white/10">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${onBsc ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                        <span className="text-sm text-gray-400">Network</span>
+                      </div>
+                      <span className="text-sm font-medium">{chain?.name || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Chain ID</span>
+                      <span className="font-mono text-sm text-gray-300">{chainId}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-400">Last Update</span>
+                      <span className="text-sm text-gray-300">{formatTimeAgo(Math.floor(lastUpdate / 1000))}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1">
+              {activeSection === "overview" && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-2.5 bg-cyan-900/30 rounded-lg">
+                          <Package className="w-5 h-5 text-cyan-400" />
+                        </div>
+                        <div className="text-xs px-2.5 py-1 bg-gray-800/50 rounded-full text-gray-400">
+                          Remaining
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {dashLoading ? (
+                          <div className="h-8 w-32 bg-gray-800/50 rounded-lg animate-pulse"></div>
+                        ) : (
+                          tokensRemainingFormatted
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400">{saleSymbol}</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-2.5 bg-purple-900/30 rounded-lg">
+                          <TrendingUp className="w-5 h-5 text-purple-400" />
+                        </div>
+                        <div className="text-xs px-2.5 py-1 bg-gray-800/50 rounded-full text-gray-400">
+                          Raised
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {dashLoading ? (
+                          <div className="h-8 w-32 bg-gray-800/50 rounded-lg animate-pulse"></div>
+                        ) : (
+                          `$${usdtRaisedFormatted}`
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400">{paySymbol}</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-2.5 bg-blue-900/30 rounded-lg">
+                          <Users className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div className={`text-xs px-2.5 py-1 rounded-full ${isPaused ? 'bg-red-900/30 text-red-400' : 'bg-emerald-900/30 text-emerald-400'}`}>
+                          {isPaused ? 'Paused' : 'Active'}
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {dashLoading ? (
+                          <div className="h-8 w-32 bg-gray-800/50 rounded-lg animate-pulse"></div>
+                        ) : (
+                          isPaused ? 'Paused' : 'Live'
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400">Sale Status</div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-5 backdrop-blur-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="p-2.5 bg-amber-900/30 rounded-lg">
+                          <DollarSign className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div className="text-xs px-2.5 py-1 bg-gray-800/50 rounded-full text-gray-400">
+                          Price
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold text-white mb-1">
+                        {dashLoading ? (
+                          <div className="h-8 w-32 bg-gray-800/50 rounded-lg animate-pulse"></div>
+                        ) : (
+                          `$${currentPrice}`
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400">per {saleSymbol}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-6 backdrop-blur-sm">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2.5 bg-cyan-900/30 rounded-lg">
+                          <LinkIcon className="w-6 h-6 text-cyan-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">Contract Address</h3>
+                          <p className="text-sm text-gray-400">Presale smart contract</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-gray-900/30 rounded-xl border border-gray-800">
+                          <div className="font-mono text-sm text-gray-300 break-all">
+                            {ico || "—"}
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          {ico && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(ico);
+                                  setCopied("ico");
+                                  setTimeout(() => setCopied(null), 1500);
+                                } catch {
+                                  setUiError("Copy failed");
+                                }
+                              }}
+                              className="flex-1 py-2.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                              {copied === "ico" ? "Copied!" : "Copy"}
+                            </button>
+                          )}
+                          {ico && explorerBase && (
+                            <a
+                              href={`${explorerBase}/address/${ico}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-2.5 bg-cyan-900/30 hover:bg-cyan-800/30 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              Explorer
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-6 backdrop-blur-sm">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2.5 bg-purple-900/30 rounded-lg">
+                          <Wallet className="w-6 h-6 text-purple-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white">Owner Address</h3>
+                          <p className="text-sm text-gray-400">Contract administrator</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-gray-900/30 rounded-xl border border-gray-800">
+                          <div className="font-mono text-sm text-gray-300 break-all">
+                            {ownerAddr || "—"}
+                          </div>
+                          <div className="mt-2 text-sm">
+                            <span className={isOwner ? "text-emerald-400" : "text-amber-400"}>
+                              {user ? (isOwner ? "✓ You are the owner" : "✗ Not the owner") : "Connect wallet"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          {ownerAddr && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(ownerAddr);
+                                  setCopied("owner");
+                                  setTimeout(() => setCopied(null), 1500);
+                                } catch {
+                                  setUiError("Copy failed");
+                                }
+                              }}
+                              className="flex-1 py-2.5 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                              {copied === "owner" ? "Copied!" : "Copy"}
+                            </button>
+                          )}
+                          {ownerAddr && explorerBase && (
+                            <a
+                              href={`${explorerBase}/address/${ownerAddr}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 py-2.5 bg-purple-900/30 hover:bg-purple-800/30 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              Explorer
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === "token-config" && (
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-6 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2.5 bg-blue-900/30 rounded-lg">
+                      <ShieldCheck className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Token Setup</h3>
+                      <p className="text-sm text-gray-400">Configure the sale token (one-time operation)</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="p-5 rounded-xl border border-white/10 bg-gradient-to-r from-gray-900/30 to-black/20">
+                      <div className="text-sm font-medium text-white mb-3">Current Status</div>
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${saleTokenAlreadySet ? 'bg-emerald-900/30' : 'bg-amber-900/30'}`}>
+                          {saleTokenAlreadySet ? (
+                            <CheckCircle className="w-5 h-5 text-emerald-400" />
+                          ) : (
+                            <AlertCircle className="w-5 h-5 text-amber-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium">
+                            {saleTokenAlreadySet ? "Token is configured" : "Token not configured yet"}
+                          </div>
+                          <div className="text-sm text-gray-400 truncate font-mono">
+                            {saleTokenAlreadySet ? shortAddr(dash?.tokenAddr) : "Setup required before sale can start"}
+                          </div>
+                          {saleTokenAlreadySet && dash?.tokenAddr && (
+                            <div className="mt-2 flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(dash.tokenAddr);
+                                    setCopied("token-addr");
+                                    setTimeout(() => setCopied(null), 1500);
+                                  } catch {
+                                    setUiError("Copy failed");
+                                  }
+                                }}
+                                className="text-xs px-2 py-1 bg-gray-800/50 hover:bg-gray-700/50 rounded-md flex items-center gap-1 transition-colors"
+                              >
+                                <Copy className="w-3 h-3" />
+                                {copied === "token-addr" ? "Copied!" : "Copy"}
+                              </button>
+                              {explorerBase && (
+                                <a
+                                  href={`${explorerBase}/address/${dash.tokenAddr}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs px-2 py-1 bg-blue-900/30 hover:bg-blue-800/30 rounded-md flex items-center gap-1 transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  View
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-medium text-white">Set Token Address</div>
+                          <div className="text-xs px-2 py-1 bg-blue-900/30 text-blue-400 rounded-full">
+                            Required
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
+                              <div className="p-2 bg-gray-800/50 rounded-lg">
+                                <Package className="w-4 h-4 text-gray-400" />
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="0x0000000000000000000000000000000000000000"
+                              value={saleTokenInput}
+                              onChange={(e) => setSaleTokenInput(e.target.value)}
+                              className="w-full pl-14 pr-32 py-3.5 bg-gray-900/50 border-2 border-gray-800 rounded-xl font-mono text-sm text-white focus:outline-none focus:border-blue-500 focus:bg-black/60 transition-all duration-200 placeholder:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={saleTokenAlreadySet || !isOwner}
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                              <div className="text-xs px-2.5 py-1 bg-gray-800/80 text-gray-300 rounded-full border border-gray-700/50">
+                                ERC-20
+                              </div>
+                              {saleTokenInput && (
+                                <button
+                                  onClick={() => setSaleTokenInput("")}
+                                  className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+                                  aria-label="Clear input"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            
+                            {saleTokenInput.trim() && (
+                              <div className="absolute left-4 top-full mt-1.5 flex items-center gap-1.5">
+                                {isAddress(saleTokenInput.trim()) ? (
+                                  <>
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="text-xs text-emerald-400 font-medium">Valid address</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="w-3.5 h-3.5 text-red-400" />
+                                    <span className="text-xs text-red-400 font-medium">Invalid address</span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="text-xs text-gray-500 pl-1">
+                            Enter the exact ERC-20 token contract address. This will be the token sold in the presale.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <button
+                          disabled={
+                            !onBsc || 
+                            !isOwner || 
+                            isPending || 
+                            saleTokenAlreadySet || 
+                            !saleTokenInput.trim() || 
+                            !isAddress(saleTokenInput.trim())
+                          }
+                          onClick={onSetSaleToken}
+                          className="relative w-full py-3.5 bg-gradient-to-r from-blue-700/90 to-cyan-700/90 hover:from-blue-600 hover:to-cyan-600 disabled:from-gray-900 disabled:to-gray-800 disabled:text-gray-500 rounded-xl font-bold text-base transition-all duration-300 hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed overflow-hidden group"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-cyan-600/20 to-blue-600/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                          
+                          <div className="relative z-10 flex items-center justify-center gap-3">
+                            {isPending ? (
+                              <>
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Configuring Token...</span>
+                              </>
+                            ) : saleTokenAlreadySet ? (
+                              <>
+                                <CheckCircle className="w-5 h-5" />
+                                <span>Token Already Configured</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-5 h-5" />
+                                <span>Configure Token Contract</span>
+                              </>
+                            )}
+                          </div>
+                        </button>
+                        
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${onBsc ? 'bg-emerald-900/20 text-emerald-400' : 'bg-amber-900/20 text-amber-400'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${onBsc ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                            {onBsc ? 'Correct Network' : 'Wrong Network'}
+                          </div>
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${isOwner ? 'bg-emerald-900/20 text-emerald-400' : 'bg-amber-900/20 text-amber-400'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${isOwner ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                            {isOwner ? 'Owner Access' : 'Not Owner'}
+                          </div>
+                          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${saleTokenAlreadySet ? 'bg-gray-900/20 text-gray-400' : 'bg-blue-900/20 text-blue-400'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${saleTokenAlreadySet ? 'bg-gray-400' : 'bg-blue-400'}`} />
+                            {saleTokenAlreadySet ? 'Already Set' : 'Ready to Configure'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-5 rounded-xl border border-amber-800/40 bg-gradient-to-r from-amber-900/20 to-orange-900/10">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="font-medium text-amber-200 mb-2">Important Notice</div>
+                          <ul className="text-sm text-amber-300/80 space-y-1">
+                            <li>• This is a <span className="font-bold">one-time operation</span> and cannot be reversed</li>
+                            <li>• Double-check the token address before submitting</li>
+                            <li>• Ensure the token contract is verified on the blockchain explorer</li>
+                            <li>• Once set, the sale will be ready to accept purchases</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === "price-settings" && (
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-6 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2.5 bg-blue-900/30 rounded-lg">
+                      <DollarSign className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Price Settings</h3>
+                      <p className="text-sm text-gray-400">Update token price in {paySymbol}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-800/30">
+                      <div className="text-center">
+                        <div className="text-sm text-gray-400 mb-2">Current Price</div>
+                        <div className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent mb-2">
+                          {dashLoading ? (
+                            <div className="h-12 w-48 bg-gray-800/50 rounded-lg animate-pulse mx-auto"></div>
+                          ) : (
+                            `$${currentPrice}`
+                          )}
+                        </div>
+                        <div className="text-lg text-gray-300">
+                          1 {saleSymbol} = ${currentPrice} {paySymbol}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div>
+                        <div className="text-sm font-medium text-white mb-3">Set New Price</div>
+                        <div className="relative">
+                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">
+                            $
+                          </div>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={priceInput}
+                            onChange={(e) => setPriceInput(e.target.value)}
+                            className="w-full pl-10 pr-4 py-4 bg-black/40 border border-white/10 rounded-xl text-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-600"
+                            disabled={!isOwner || !saleTokenAlreadySet}
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                            {paySymbol}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500">
+                          Enter the price in {paySymbol} for 1 {saleSymbol}
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={!onBsc || !isOwner || isPending || !saleTokenAlreadySet || !priceInput.trim()}
+                        onClick={onUpdatePrice}
+                        className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:from-gray-800 disabled:to-gray-900 disabled:text-gray-400 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-[1.02] disabled:hover:scale-100 flex items-center justify-center gap-3"
+                      >
+                        {isPending ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Updating Price...
+                          </>
+                        ) : (
+                          "Update Price"
+                        )}
+                      </button>
+                    </div>
+
+                    {!saleTokenAlreadySet && (
+                      <div className="p-4 rounded-xl border border-amber-800/40 bg-gradient-to-r from-amber-900/20 to-orange-900/10">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="w-5 h-5 text-amber-400" />
+                          <div className="text-sm text-amber-300/80">
+                            Token must be configured before setting price
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="p-4 rounded-xl border border-blue-800/40 bg-gradient-to-r from-blue-900/20 to-cyan-900/10">
+                      <div className="flex items-start gap-3">
+                        <Info className="w-5 h-5 text-blue-400 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="font-medium text-blue-200 mb-2">Price Information</div>
+                          <div className="text-sm text-blue-300/80">
+                            The price determines how much {paySymbol} is required to purchase 1 {saleSymbol}.
+                            This can be updated at any time by the contract owner.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === "sale-controls" && (
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 p-6 backdrop-blur-sm">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2.5 bg-blue-900/30 rounded-lg">
+                      <Cpu className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Sale Controls</h3>
+                      <p className="text-sm text-gray-400">Manage sale status and timing</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* Sale Status - Fixed Professional UI */}
+                    <div className="rounded-xl border border-white/10 bg-gradient-to-r from-gray-900/30 to-black/20 p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-3 rounded-xl ${isPaused ? 'bg-red-900/30 border border-red-800/40' : 'bg-emerald-900/30 border border-emerald-800/40'}`}>
+                              {isPaused ? (
+                                <PauseCircle className="w-6 h-6 text-red-400" />
+                              ) : (
+                                <PlayCircle className="w-6 h-6 text-emerald-400" />
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-white">Sale Status</h4>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-red-400 animate-pulse' : 'bg-emerald-400 animate-pulse'}`} />
+                                <span className={`font-medium ${isPaused ? 'text-red-400' : 'text-emerald-400'}`}>
+                                  {isPaused ? 'PAUSED' : 'ACTIVE'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-400 max-w-md">
+                            {isPaused 
+                              ? "Sale is paused. No new purchases can be made until resumed." 
+                              : "Sale is active and accepting purchases according to current settings."}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button
+                            disabled={!onBsc || !isOwner || isPending || isPaused}
+                            onClick={onPause}
+                            className="px-5 py-3 bg-gradient-to-r from-red-700 to-orange-700 hover:from-red-600 hover:to-orange-600 disabled:from-gray-800 disabled:to-gray-900 disabled:text-gray-500 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <PauseCircle className="w-4 h-4" />
+                                Pause Sale
+                              </>
+                            )}
+                          </button>
+                          
+                          <button
+                            disabled={!onBsc || !isOwner || isPending || !isPaused}
+                            onClick={onUnpause}
+                            className="px-5 py-3 bg-gradient-to-r from-emerald-700 to-green-700 hover:from-emerald-600 hover:to-green-600 disabled:from-gray-800 disabled:to-gray-900 disabled:text-gray-500 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[140px]"
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="w-4 h-4" />
+                                Resume Sale
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sale Window - Fixed Professional UI */}
+                    <div className="rounded-xl border border-white/10 bg-gradient-to-r from-gray-900/30 to-black/20 p-6">
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-bold text-white">Sale Window Settings</h4>
+                            <p className="text-sm text-gray-400">Control when the sale is available</p>
+                          </div>
+                          <div className={`px-3 py-1.5 rounded-full text-sm ${dash?.start === 0n && dash?.end === 0n ? 'bg-gray-800/50 text-gray-400' : 'bg-blue-900/30 text-blue-400'}`}>
+                            {dash?.start === 0n && dash?.end === 0n ? 'Always Open' : 'Time Limited'}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <label className="text-sm text-gray-400 flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              Start Time (Unix)
+                            </label>
+                            <input
+                              value={startInput}
+                              onChange={(e) => setStartInput(e.target.value)}
+                              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="0 for always open"
+                              disabled={!isOwner}
+                            />
+                            {startInput !== "0" && startInput !== "" && (
+                              <div className="text-xs text-gray-500">
+                                {new Date(Number(startInput) * 1000).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <label className="text-sm text-gray-400 flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              End Time (Unix)
+                            </label>
+                            <input
+                              value={endInput}
+                              onChange={(e) => setEndInput(e.target.value)}
+                              className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="0 for always open"
+                              disabled={!isOwner}
+                            />
+                            {endInput !== "0" && endInput !== "" && (
+                              <div className="text-xs text-gray-500">
+                                {new Date(Number(endInput) * 1000).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <button
+                            disabled={!onBsc || !isOwner || isPending}
+                            onClick={onSetSaleWindow}
+                            className="flex-1 py-3.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:from-gray-800 disabled:to-gray-900 disabled:text-gray-400 rounded-xl font-bold transition-all duration-200 hover:scale-[1.02] disabled:hover:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                          >
+                            {isPending ? (
+                              <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              'Update Sale Window'
+                            )}
+                          </button>
+                          <button
+                            disabled={!onBsc || !isOwner || isPending}
+                            onClick={() => {
+                              setStartInput("0");
+                              setEndInput("0");
+                              onSetSaleWindow();
+                            }}
+                            className="flex-1 py-3.5 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-900 disabled:text-gray-500 rounded-xl font-bold transition-colors disabled:cursor-not-allowed"
+                          >
+                            Disable Time Limits
+                          </button>
+                        </div>
+
+                        <div className="p-4 bg-gray-900/30 rounded-lg border border-gray-800">
+                          <div className="text-sm text-gray-400 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Info className="w-4 h-4" />
+                              <span className="font-medium">How it works:</span>
+                            </div>
+                            <ul className="space-y-1 pl-6 list-disc text-gray-500">
+                              <li>Set both timestamps to 0 for always-open sale</li>
+                              <li>Use Unix timestamps in seconds</li>
+                              <li>End time must be greater than start time</li>
+                              <li>Current time: {Math.floor(Date.now() / 1000)}</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

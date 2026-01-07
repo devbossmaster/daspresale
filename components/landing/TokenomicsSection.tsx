@@ -68,7 +68,7 @@ const TokenomicsSection = () => {
     <section
       id="tokenomics"
       ref={ref}
-      className="relative py-20 sm:py-28 overflow-hidden"
+      className="relative cutive py-20 sm:py-28 overflow-hidden"
     >
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute top-0 left-1/3 h-72 w-72 rounded-full bg-[#FF6FD8]/10 blur-3xl" />

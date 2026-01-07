@@ -1,4 +1,3 @@
-// lib/hooks/useTokenIcoDashboard.ts
 "use client";
 
 import { useMemo } from "react";
@@ -35,7 +34,6 @@ type GetPresaleSettingsReturn = readonly [
 ];
 
 function safeTs(v: bigint) {
-  // timestamps should be well within JS safe range; if not, fall back to 0
   const max = BigInt(Number.MAX_SAFE_INTEGER);
   return v > max ? 0 : Number(v);
 }
@@ -82,6 +80,7 @@ export function useTokenIcoDashboard() {
     query: { enabled: !!payTokenAddr && !isZeroAddress(payTokenAddr), refetchInterval: 60_000 },
   });
 
+  // Parse dashboard data from ICO contract reads
   const parsed = useMemo(() => {
     const ci = contractInfo.data as GetContractInfoReturn | undefined;
     const ps = presaleSettings.data as GetPresaleSettingsReturn | undefined;
@@ -104,11 +103,18 @@ export function useTokenIcoDashboard() {
     const tokensRemainingHuman = formatUnits(tokensRemaining ?? 0n, decimals);
     const totalTokensSoldHuman = formatUnits(totalTokensSold ?? 0n, decimals);
 
+    // Progress: prefer explicit caps; fallback to sold / (sold + remaining)
     let progressPct: number | null = null;
+
     if (hardCapTokens > 0n) {
       progressPct = Math.min(100, Number((totalTokensSold * 10000n) / hardCapTokens) / 100);
     } else if (hardCapUSDT > 0n) {
       progressPct = Math.min(100, Number((usdtRaised * 10000n) / hardCapUSDT) / 100);
+    } else {
+      const impliedCap = totalTokensSold + tokensRemaining;
+      if (impliedCap > 0n) {
+        progressPct = Math.min(100, Number((totalTokensSold * 10000n) / impliedCap) / 100);
+      }
     }
 
     return {
@@ -158,21 +164,44 @@ export function useTokenIcoDashboard() {
     paySymbolRead.data,
   ]);
 
+  // FIX #1: Read user's SALE TOKEN balance correctly (tokenAddr + enabled)
+  const saleTokenAddr = parsed?.tokenAddr;
+
   const userTokenBalance = useReadContract({
-    address: parsed?.tokenAddr && !isZeroAddress(parsed.tokenAddr) ? parsed.tokenAddr : undefined,
+    address: saleTokenAddr,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: user ? [user] : undefined,
     query: {
-      enabled: !!user && !!parsed?.tokenAddr && !isZeroAddress(parsed?.tokenAddr),
+      enabled: !!user && !!saleTokenAddr && !isZeroAddress(saleTokenAddr),
       refetchInterval: 8_000,
     },
   });
 
   const userBalHuman = useMemo(() => {
-    if (!parsed || userTokenBalance.data === undefined) return "—";
+    if (!parsed) return "—";
+    if (userTokenBalance.data === undefined) return "—";
     return fmtNum(formatUnits(userTokenBalance.data as bigint, parsed.decimals), 4);
   }, [userTokenBalance.data, parsed]);
+
+  // Combined refetch function
+  const refetchAll = async () => {
+    const results = await Promise.allSettled([
+      contractInfo.refetch(),
+      presaleSettings.refetch(),
+      payTokenRead.refetch(),
+      payDecimalsRead.refetch(),
+      paySymbolRead.refetch(),
+      userTokenBalance.refetch(),
+    ]);
+
+    const errors = results.filter((r) => r.status === "rejected");
+    if (errors.length > 0) {
+      console.error("Refetch errors:", errors);
+    }
+
+    return results;
+  };
 
   return {
     ico,
@@ -181,14 +210,17 @@ export function useTokenIcoDashboard() {
       presaleSettings.isLoading ||
       payTokenRead.isLoading ||
       payDecimalsRead.isLoading ||
-      paySymbolRead.isLoading,
+      paySymbolRead.isLoading ||
+      userTokenBalance.isLoading,
     error:
       contractInfo.error ||
       presaleSettings.error ||
       payTokenRead.error ||
       payDecimalsRead.error ||
-      paySymbolRead.error,
+      paySymbolRead.error ||
+      userTokenBalance.error,
     data: parsed,
     userBalHuman,
+    refetch: refetchAll,
   };
 }

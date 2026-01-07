@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import TokenStats from "@/components/dashboard/TokenStats";
-import TransactionHistory from "@/components/dashboard/TransactionHistory";
 import RaisedFunds from "@/components/dashboard/RaisedFunds";
 import { useAccount, useChainId } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { getTokenIcoAddress } from "@/lib/contracts/addresses";
+import TokenStats from "@/components/dashboard/TokenStats";
 
 export default function DashboardPage() {
   const chainId = useChainId();
@@ -76,7 +75,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <TransactionHistory />
     </div>
   );
 }

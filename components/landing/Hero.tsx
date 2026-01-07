@@ -60,7 +60,7 @@ const Hero = () => {
       id="home"
       ref={ref}
       // NOTE: no bg-* here => transparent, uses page background
-      className="relative mt-6 flex flex-col items-center"
+      className="relative cutive mt-6 flex flex-col items-center"
     >
       {/* Main content – free, full width like other pages */}
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 space-y-12">
@@ -83,7 +83,7 @@ const Hero = () => {
             <Sparkles className="w-4 h-4 text-cyan-400" />
             <span className="text-xs sm:text-sm font-medium bg-gradient-to-r
                              from-cyan-300 via-purple-300 to-pink-300
-                             bg-clip-text text-transparent">
+                             bg-clip-text text-transparent cutive-mono-regular ">
               NEXT-GEN WEB3 ECOSYSTEM
             </span>
           </motion.div>

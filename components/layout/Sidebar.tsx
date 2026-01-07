@@ -17,7 +17,11 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/contracts/utils";
-import { useAccount, useReadContract } from "wagmi";
+
+// ✅ add these
+import { useAccount, useChainId, useReadContract } from "wagmi";
+import { tokenIcoAbi } from "@/lib/contracts/abi/tokenIcoAbi";
+import { getTokenIcoAddress } from "@/lib/contracts/addresses";
 
 type NavItem = {
   name: string;
@@ -32,48 +36,38 @@ type SidebarProps = {
   onClose: () => void;
 };
 
-const OWNABLE_ABI = [
-  {
-    type: "function",
-    name: "owner",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-] as const;
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as const;
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // ---- Wallet + Presale owner gating (ONLY owner sees admin menu) ----
-  const { address, isConnected } = useAccount();
+  // ✅ ownership check
+  const chainId = useChainId();
+  const ico = getTokenIcoAddress(chainId);
+  const { address } = useAccount();
 
-  // Set in .env.local:
-  // NEXT_PUBLIC_PRESALE_ADDRESS=0xYourPresaleContractAddress
-  const presaleAddress = (process.env.NEXT_PUBLIC_PRESALE_ADDRESS || "") as `0x${string}`;
-
-  const { data: ownerAddress, isLoading: ownerLoading } = useReadContract({
-    address: presaleAddress,
-    abi: OWNABLE_ABI,
+  const ownerRead = useReadContract({
+    address: ico,
+    abi: tokenIcoAbi,
     functionName: "owner",
-    query: {
-      enabled: Boolean(presaleAddress),
-    },
+    query: { enabled: !!ico },
   });
 
-  const isPresaleOwner =
-    isConnected &&
-    !!address &&
-    !!ownerAddress &&
-    address.toLowerCase() === String(ownerAddress).toLowerCase();
+  const owner = (ownerRead.data as `0x${string}` | undefined) ?? undefined;
+
+  const isOwner = useMemo(() => {
+    if (!address || !owner) return false;
+    if (owner === ZERO_ADDR) return false;
+    return address.toLowerCase() === owner.toLowerCase();
+  }, [address, owner]);
 
   const navigation: NavItem[] = useMemo(
     () => [
       { name: "Dashboard", href: "/dashboard", icon: Home, description: "Overview & analytics" },
       { name: "Users", href: "/user-dashboard", icon: Users, description: "User management" },
       { name: "Token Sale", href: "/token-sale", icon: ShoppingCart, description: "Buy & sell tokens" },
-      { name: "Transfer", href: "/token-transfer", icon: Repeat, description: "Transfer tokens" },
+      { name: "Transfer", href: "/token-transfers", icon: Repeat, description: "Transfer tokens" },
       { name: "Transactions", href: "/transaction", icon: History, description: "Transaction history" },
     ],
     []
@@ -164,7 +158,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       {/* Overlay (mobile only) */}
       {open && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          className="lg:hidden  fixed inset-0 z-40 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={onClose}
           aria-hidden="true"
         />
@@ -173,7 +167,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static inset-y-0 left-0 z-50 lg:z-auto",
+          "fixed lg:static cutive inset-y-0 left-0 z-50 lg:z-auto",
           "w-72 bg-gradient-to-b from-gray-950 via-gray-900 to-black text-gray-100",
           "border-r border-gray-800/50 shadow-2xl shadow-black/30",
           "transform transition-all duration-300 ease-out",
@@ -189,7 +183,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <div className={cn("flex items-center gap-2 transition-all duration-300", isCollapsed && "justify-center w-full")}>
             <div className="relative">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white">
-                <Link href={"/"}>S</Link>
+                S
               </div>
               <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900" />
             </div>
@@ -242,19 +236,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             <div className="space-y-1">{navigation.map((item) => <NavLink key={item.name} item={item} />)}</div>
           </div>
 
-          {/* Administration (ONLY presale owner wallet) */}
-          {!ownerLoading && isPresaleOwner && (
+          {/* ✅ Render admin links only for owner */}
+          {isOwner && (
             <div className="space-y-2">
               {!isCollapsed && (
                 <div className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Administration
                 </div>
               )}
-              <div className="space-y-1">
-                {adminNavigation.map((item) => (
-                  <NavLink key={item.name} item={item} />
-                ))}
-              </div>
+              <div className="space-y-1">{adminNavigation.map((item) => <NavLink key={item.name} item={item} />)}</div>
             </div>
           )}
         </nav>

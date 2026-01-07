@@ -1,9 +1,8 @@
-// components/dashboard/TokenStats.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatUnits } from "viem";
-import { TrendingUp, DollarSign, Package, Users, Clock } from "lucide-react";
+import { TrendingUp, DollarSign, Package, Users, Clock, RefreshCw, AlertCircle } from "lucide-react";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
 import { useMounted } from "@/lib/hooks/useMounted";
 
@@ -25,33 +24,36 @@ function formatTs(ts: number) {
   if (!ts) return "—";
   const d = new Date(ts * 1000);
   return d.toLocaleString(undefined, {
-    year: "numeric",
     month: "short",
-    day: "2-digit",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
+
 function humanizeError(err: unknown) {
   const msg =
     (err as any)?.shortMessage ||
     (err as any)?.message ||
     (err as any)?.cause?.shortMessage ||
     (err as any)?.cause?.message ||
-    "";
+    "Unknown error";
 
   const s = String(msg).toLowerCase();
 
   if (s.includes("127.0.0.1") || s.includes("localhost")) {
-    return "The app is trying to use a local RPC. Please switch your wallet to BSC and ensure your app is configured for BSC RPC only.";
+    return "Connect to BSC mainnet";
   }
   if (s.includes("http request failed") || s.includes("failed to fetch") || s.includes("network error")) {
-    return "Unable to reach the BSC RPC. Please check your RPC URL and connection.";
+    return "Network error. Please check connection";
   }
   if (s.includes("execution reverted") || s.includes("contractfunctionexecutionerror")) {
-    return "Contract call reverted. Confirm the presale contract address is correct on BSC.";
+    return "Contract call failed";
   }
-  return "Could not load token statistics right now. Please try again.";
+  if (s.includes("user rejected")) {
+    return "Transaction was rejected";
+  }
+  return "Could not load data";
 }
 
 function computeStatus(input: {
@@ -88,15 +90,54 @@ function computeStatus(input: {
 
 export default function TokenStats() {
   const mounted = useMounted();
-  const { data, isLoading, userBalHuman, error } = useTokenIcoDashboard();
+  const { data, isLoading: dashLoading, userBalHuman, error, refetch } = useTokenIcoDashboard();
+  
+  // State for manual refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // State to track if we have initial data
+  const [hasInitialData, setHasInitialData] = useState(false);
+  
+  // Cache last successful data
+  const [cachedData, setCachedData] = useState<typeof data | null>(null);
+  const [cachedUserBal, setCachedUserBal] = useState<string | null>(null);
 
-  const symbol = data?.symbol ?? "TOKEN";
-  const payDecimals = data?.payDecimals ?? 18;
-  const paySymbol = data?.paySymbol ?? "USDT";
+  // Update cache when new data arrives
+  useEffect(() => {
+    if (data && !dashLoading) {
+      setCachedData(data);
+      setHasInitialData(true);
+    }
+  }, [data, dashLoading]);
 
-  const priceRaw = data?.tokenPrice ?? 0n; // payToken units per 1 token
-  const raisedRaw = data?.usdtRaised ?? 0n; // payToken
-  const remainingRaw = data?.tokensRemaining ?? 0n;
+  useEffect(() => {
+    if (userBalHuman !== undefined && userBalHuman !== null && !dashLoading) {
+      setCachedUserBal(userBalHuman);
+    }
+  }, [userBalHuman, dashLoading]);
+
+  // Use cached data when loading (except first load)
+  const stableDash = hasInitialData ? (data || cachedData) : data;
+  const stableUserBal = hasInitialData ? (userBalHuman || cachedUserBal || "—") : userBalHuman || "—";
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch?.();
+    } catch (error) {
+      console.error("Refresh failed:", error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  const symbol = stableDash?.symbol ?? "TOKEN";
+  const payDecimals = stableDash?.payDecimals ?? 18;
+  const paySymbol = stableDash?.paySymbol ?? "USDT";
+
+  const priceRaw = stableDash?.tokenPrice ?? 0n;
+  const raisedRaw = stableDash?.usdtRaised ?? 0n;
+  const remainingRaw = stableDash?.tokensRemaining ?? 0n;
 
   const priceHuman = useMemo(() => {
     if (priceRaw <= 0n) return null;
@@ -107,17 +148,17 @@ export default function TokenStats() {
     return trimDecimals(formatUnits(raisedRaw, payDecimals), 4);
   }, [raisedRaw, payDecimals]);
 
-  const remainingHuman = data?.tokensRemainingHuman ?? "—";
+  const remainingHuman = stableDash?.tokensRemainingHuman ?? "—";
 
-  const progress = data?.progressPct ?? null;
+  const progress = stableDash?.progressPct ?? null;
   const progressSafe = progress === null ? 0 : clamp(progress);
 
   const status = computeStatus({
-    paused: data?.paused,
-    start: data?.start,
-    end: data?.end,
-    tokenAddr: data?.tokenAddr,
-    tokenPrice: data?.tokenPrice,
+    paused: stableDash?.paused,
+    start: stableDash?.start,
+    end: stableDash?.end,
+    tokenAddr: stableDash?.tokenAddr,
+    tokenPrice: stableDash?.tokenPrice,
     tokensRemaining: remainingRaw,
   });
 
@@ -128,128 +169,203 @@ export default function TokenStats() {
         ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
         : "bg-red-500/10 text-red-200 border-red-500/30";
 
-  const windowEnabled = data ? isSaleWindowEnabled(data.start, data.end) : false;
+  const windowEnabled = stableDash ? isSaleWindowEnabled(stableDash.start, stableDash.end) : false;
   const windowText =
-    !mounted || !data
+    !mounted || !stableDash
       ? "—"
       : windowEnabled
-        ? `${formatTs(data.start)} → ${formatTs(data.end)}`
-        : "Always open (no window)";
+        ? `${formatTs(stableDash.start)} → ${formatTs(stableDash.end)}`
+        : "Always open";
+
+  // Determine loading state - only show loading on initial load, not on refetches
+  const isInitialLoading = dashLoading && !hasInitialData;
+  
+  // Show error only if we don't have cached data
+  const showError = !!error && !hasInitialData;
 
   return (
-    <div className="relative overflow-hidden rounded-xl md:rounded-2xl border border-slate-800 bg-gradient-to-br from-black to-slate-950 p-4 md:p-6 shadow-lg">
-      <div className="absolute inset-0 opacity-5 bg-[linear-gradient(45deg,transparent_25%,rgba(6,182,212,0.1)_50%,transparent_75%)] bg-[length:20px_20px]" />
-
+    <div className="relative overflow-hidden rounded-xl md:rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl p-4 md:p-6 shadow-2xl">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+      
       <div className="relative space-y-5 md:space-y-6">
+        {/* Header with refresh button */}
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">Token Statistics</h2>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg md:text-xl font-semibold text-white">Token Statistics</h2>
+              {!isInitialLoading && hasInitialData && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg hover:bg-white/10 transition-all duration-200 disabled:opacity-50"
+                  aria-label="Refresh data"
+                >
+                  <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+            </div>
             <div className="mt-2 inline-flex items-center gap-2 text-xs text-gray-400">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-3.5 h-3.5" />
               <span className="truncate">{windowText}</span>
             </div>
           </div>
 
           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${statusPill}`}>
-            <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <div className={`w-2 h-2 rounded-full ${
+              status.tone === 'success' ? 'bg-emerald-400 animate-pulse' :
+              status.tone === 'warning' ? 'bg-amber-400' : 'bg-red-400'
+            }`} />
             <span className="text-xs md:text-sm font-medium">{status.label}</span>
           </div>
         </div>
 
-        {error && (
-  <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-100">
-    <div className="font-semibold">Unable to load token statistics</div>
-    <div className="mt-1 text-red-200">{humanizeError(error)}</div>
+        {/* Error Message */}
+        {showError && (
+          <div className="rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/5 p-4 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-red-200">Unable to load token statistics</div>
+                <div className="mt-1 text-sm text-red-300/80">{humanizeError(error)}</div>
+                <button
+                  onClick={handleRefresh}
+                  className="mt-2 text-sm px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg transition-colors"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-    <details className="mt-2 text-xs text-red-200/80">
-      <summary className="cursor-pointer select-none">Details</summary>
-      <div className="mt-2 whitespace-pre-wrap break-words opacity-80">
-        {(error as any)?.shortMessage || (error as any)?.message || "—"}
-      </div>
-    </details>
-  </div>
-)}
-
+        {/* Stats Grid */}
         <div className="space-y-3 md:space-y-4">
-          {/* Your wallet balance */}
-          <div className="p-4 md:p-5 bg-black/30 rounded-xl border border-slate-800 backdrop-blur-sm">
+          {/* Your Token Balance */}
+          <div className="group p-4 md:p-5 bg-gradient-to-br from-gray-900/50 to-black/30 rounded-xl border border-white/10 backdrop-blur-sm hover:border-blue-500/30 transition-all duration-300">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 md:gap-4">
-                <div className="p-2.5 rounded-lg bg-cyan-500/10">
+                <div className="p-2.5 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20">
                   <Package className="w-5 h-5 md:w-6 md:h-6 text-cyan-400" />
                 </div>
                 <div>
                   <p className="text-xs md:text-sm text-gray-400">Your Tokens</p>
-                  <p className="text-xl md:text-2xl font-bold mt-1">
-                    {isLoading ? "Loading..." : userBalHuman}{" "}
-                    <span className="text-base text-cyan-300">{symbol}</span>
-                  </p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    {isInitialLoading ? (
+                      <div className="h-7 w-32 bg-gray-800/50 rounded-lg animate-pulse" />
+                    ) : (
+                      <>
+                        <p className="text-xl md:text-2xl font-bold text-white">
+                          {stableUserBal}
+                        </p>
+                        <span className="text-base text-cyan-300/80">{symbol}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-gray-400">Price</p>
-                <p className="text-sm font-semibold text-cyan-300">
-                  {isLoading ? "—" : priceHuman ? `${priceHuman} ${paySymbol}` : "—"}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-0.5">per token</p>
+                {isInitialLoading ? (
+                  <div className="h-6 w-24 bg-gray-800/50 rounded animate-pulse mt-1" />
+                ) : (
+                  <p className="text-sm font-semibold text-cyan-300">
+                    {priceHuman ? `${priceHuman} ${paySymbol}` : "—"}
+                  </p>
+                )}
+                <p className="text-[11px] text-gray-500/80 mt-0.5">per token</p>
               </div>
             </div>
           </div>
-
-          {/* Raised */}
-          <div className="p-4 md:p-5 bg-black/30 rounded-xl border border-slate-800 backdrop-blur-sm">
+{/* 
+          Total Raised
+          <div className="group p-4 md:p-5 bg-gradient-to-br from-gray-900/50 to-black/30 rounded-xl border border-white/10 backdrop-blur-sm hover:border-purple-500/30 transition-all duration-300">
             <div className="flex items-center gap-3 md:gap-4">
-              <div className="p-2.5 rounded-lg bg-purple-500/10">
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-600/20">
                 <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs md:text-sm text-gray-400">Total Raised</p>
-                <p className="text-xl md:text-2xl font-bold mt-1">
-                  {isLoading ? "Loading..." : `${raisedHuman} ${paySymbol}`}
-                </p>
+                {isInitialLoading ? (
+                  <div className="h-7 w-40 bg-gray-800/50 rounded-lg animate-pulse mt-1" />
+                ) : (
+                  <p className="text-xl md:text-2xl font-bold text-white mt-1">
+                    {raisedHuman} <span className="text-base text-purple-300/80">{paySymbol}</span>
+                  </p>
+                )}
               </div>
             </div>
-          </div>
+          </div> */}
 
-          {/* Remaining tokens in ICO contract */}
-          <div className="p-4 md:p-5 bg-black/30 rounded-xl border border-slate-800 backdrop-blur-sm">
+          {/* Available For Sale */}
+          <div className="group p-4 md:p-5 bg-gradient-to-br from-gray-900/50 to-black/30 rounded-xl border border-white/10 backdrop-blur-sm hover:border-emerald-500/30 transition-all duration-300">
             <div className="flex items-center gap-3 md:gap-4">
-              <div className="p-2.5 rounded-lg bg-emerald-500/10">
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-600/20">
                 <Users className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-xs md:text-sm text-gray-400">Available For Sale</p>
-                <p className="text-xl md:text-2xl font-bold mt-1">
-                  {isLoading ? "Loading..." : remainingHuman}{" "}
-                  <span className="text-base text-emerald-300">{symbol}</span>
-                </p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  {isInitialLoading ? (
+                    <div className="h-7 w-40 bg-gray-800/50 rounded-lg animate-pulse" />
+                  ) : (
+                    <>
+                      <p className="text-xl md:text-2xl font-bold text-white">
+                        {remainingHuman}
+                      </p>
+                      <span className="text-base text-emerald-300/80">{symbol}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Progress */}
-        <div className="pt-4 border-t border-slate-800/50">
+        {/* Progress Bar */}
+        <div className="pt-4 border-t border-white/10">
           <div className="flex justify-between items-center mb-3">
             <span className="text-sm text-gray-400">Sale Progress</span>
-            <span className="text-base font-semibold">
-              {progress === null ? "N/A" : `${progressSafe.toFixed(1)}%`}
+            <span className="text-base font-semibold text-white">
+              {isInitialLoading ? (
+                <div className="h-5 w-12 bg-gray-800/50 rounded animate-pulse" />
+              ) : (
+                progress === null ? "N/A" : `${progressSafe.toFixed(1)}%`
+              )}
             </span>
           </div>
 
-          <div className="relative h-2.5 rounded-full bg-slate-900 overflow-hidden">
-            <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
-              style={{ width: `${progress === null ? 0 : progressSafe}%` }}
-            />
+          <div className="relative h-2.5 rounded-full bg-gray-900/80 overflow-hidden">
+            {isInitialLoading ? (
+              <div className="h-full w-full bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 animate-shimmer bg-[length:200%_100%]" />
+            ) : (
+              <>
+                <div
+                  className="absolute h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 transition-all duration-1000 ease-out"
+                  style={{ width: `${progressSafe}%` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-gradient-x" />
+              </>
+            )}
           </div>
 
-          <div className="flex justify-between mt-2 text-xs text-gray-400">
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
             <span>0%</span>
             <span>100%</span>
           </div>
         </div>
+
+        {/* Last Updated */}
+        {hasInitialData && !dashLoading && (
+          <div className="text-xs text-gray-500/60 text-center pt-2">
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/50 animate-pulse" />
+              <span>Live data</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

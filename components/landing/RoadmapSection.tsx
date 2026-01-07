@@ -64,7 +64,7 @@ const RoadmapSection = () => {
     <section
       id="roadmap"
       ref={ref}
-      className="relative py-20 sm:py-28 overflow-hidden"
+      className="relative cutive py-20 sm:py-28 overflow-hidden"
     >
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute bottom-0 left-1/4 h-[450px] w-[450px] rounded-full bg-gradient-to-r from-[#6F8BFF]/12 via-transparent to-[#FF6FD8]/12 blur-3xl" />

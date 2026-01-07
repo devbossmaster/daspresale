@@ -13,8 +13,8 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen overflow-hidden bg-transparent text-white">
       <div>
-        <BackgroundFX />
-        <Hero />
+      <BackgroundFX />
+      <Hero />
       <FeaturesSection />
       <RoadmapSection />
       <TokenomicsSection />

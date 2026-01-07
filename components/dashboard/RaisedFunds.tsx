@@ -1,11 +1,10 @@
-// components/dashboard/RaisedFunds.tsx
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useChainId, useChains } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { formatUnits } from "viem";
-import { DollarSign, Target, Globe, AlertTriangle } from "lucide-react";
+import { DollarSign, Target, Globe, AlertTriangle, TrendingUp, RefreshCw } from "lucide-react";
 import { useTokenIcoDashboard } from "@/lib/hooks/useTokenIcoDashboard";
 import { useRecentPurchases } from "@/lib/hooks/useRecentPurchases";
 import { getUsdtAddress } from "@/lib/contracts/addresses";
@@ -61,48 +60,103 @@ export default function RaisedFunds() {
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
 
-  const { data, isLoading: dashLoading } = useTokenIcoDashboard();
+  // State for caching and refresh
+  const [cachedData, setCachedData] = useState<ReturnType<typeof useTokenIcoDashboard>['data'] | null>(null);
+  const [cachedInvestorsCount, setCachedInvestorsCount] = useState<number | null>(null);
+  const [hasInitialData, setHasInitialData] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Investors from on-chain events (recent range; for full history use an indexer/subgraph)
-  const { investorsCount, isLoading: investorsLoading } = useRecentPurchases({
+  const { data, isLoading: dashLoading, refetch: refetchDashboard } = useTokenIcoDashboard();
+  const { investorsCount, isLoading: investorsLoading, refetch: refetchInvestors } = useRecentPurchases({
     limit: 500,
     blockRange: 50_000n,
   });
 
-  const payDecimals = data?.payDecimals ?? 18;
-  const paySymbol = data?.paySymbol ?? "USDT";
+  // Update cache when new data arrives
+  useEffect(() => {
+    if (data && !dashLoading) {
+      setCachedData(data);
+      setHasInitialData(true);
+    }
+  }, [data, dashLoading]);
 
-  const priceRaw = data?.tokenPrice; // bigint (payToken smallest units per 1 token)
-  const raisedRaw = data?.usdtRaised ?? 0n; // bigint (payToken)
-  const hardCapUsdtRaw = data?.hardCapUSDT ?? 0n; // bigint (payToken)
-  const hardCapTokensRaw = data?.hardCapTokens ?? 0n; // bigint (token)
-  const totalTokensSoldRaw = data?.totalTokensSold ?? 0n; // bigint (token)
+  useEffect(() => {
+    if (investorsCount !== undefined && !investorsLoading) {
+      setCachedInvestorsCount(investorsCount);
+    }
+  }, [investorsCount, investorsLoading]);
 
-  const pricePay = priceRaw ? trimDecimals(formatUnits(priceRaw, payDecimals), 6) : null;
-  const raisedPay = trimDecimals(formatUnits(raisedRaw, payDecimals), 4);
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchDashboard?.(), refetchInvestors?.()]);
+    } catch (error) {
+      console.error("Refresh failed:", error);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
-  const tokenDecimals = data?.decimals ?? 18;
-  const totalTokensSoldHuman = trimDecimals(formatUnits(totalTokensSoldRaw, tokenDecimals), 4);
+  // Use cached data when loading (except first load)
+  const stableDash = hasInitialData ? (data || cachedData) : data;
+  const stableInvestorsCount = hasInitialData ? (investorsCount ?? cachedInvestorsCount) : investorsCount;
+
+  // Only show loading on initial load, not on refetches
+  const isInitialLoading = (!stableDash && dashLoading) || (stableInvestorsCount === undefined && investorsLoading);
+
+  const payDecimals = stableDash?.payDecimals ?? 18;
+  const paySymbol = stableDash?.paySymbol ?? "USDT";
+
+  const priceRaw = stableDash?.tokenPrice;
+  const raisedRaw = stableDash?.usdtRaised ?? 0n;
+  const hardCapUsdtRaw = stableDash?.hardCapUSDT ?? 0n;
+  const hardCapTokensRaw = stableDash?.hardCapTokens ?? 0n;
+  const totalTokensSoldRaw = stableDash?.totalTokensSold ?? 0n;
+
+  const pricePay = useMemo(() => {
+    if (!priceRaw) return null;
+    return trimDecimals(formatUnits(priceRaw, payDecimals), 6);
+  }, [priceRaw, payDecimals]);
+
+  const raisedPay = useMemo(() => {
+    return trimDecimals(formatUnits(raisedRaw, payDecimals), 4);
+  }, [raisedRaw, payDecimals]);
+
+  const tokenDecimals = stableDash?.decimals ?? 18;
+  const totalTokensSoldHuman = useMemo(() => {
+    return trimDecimals(formatUnits(totalTokensSoldRaw, tokenDecimals), 4);
+  }, [totalTokensSoldRaw, tokenDecimals]);
 
   const hasTokenCap = hardCapTokensRaw > 0n;
   const hasUsdtCap = hardCapUsdtRaw > 0n;
 
   const targetLabel = useMemo(() => {
-    if (hasTokenCap) return `Target: ${trimDecimals(formatUnits(hardCapTokensRaw, tokenDecimals), 2)} ${data?.symbol ?? "TOKEN"}`;
+    if (hasTokenCap)
+      return `Target: ${trimDecimals(formatUnits(hardCapTokensRaw, tokenDecimals), 2)} ${stableDash?.symbol ?? "TOKEN"}`;
     if (hasUsdtCap) return `Target: ${trimDecimals(formatUnits(hardCapUsdtRaw, payDecimals), 2)} ${paySymbol}`;
     return "Target: Not set";
-  }, [hasTokenCap, hasUsdtCap, hardCapTokensRaw, hardCapUsdtRaw, tokenDecimals, payDecimals, paySymbol, data?.symbol]);
+  }, [
+    hasTokenCap,
+    hasUsdtCap,
+    hardCapTokensRaw,
+    hardCapUsdtRaw,
+    tokenDecimals,
+    payDecimals,
+    paySymbol,
+    stableDash?.symbol,
+  ]);
 
-  const progress = data?.progressPct ?? null;
+  const progress = stableDash?.progressPct ?? null;
   const progressSafe = clamp(progress ?? 0);
 
   const status = computeSaleStatus({
-    paused: data?.paused,
-    start: data?.start,
-    end: data?.end,
-    tokenAddr: data?.tokenAddr,
-    tokenPrice: data?.tokenPrice,
-    tokensRemaining: data?.tokensRemaining,
+    paused: stableDash?.paused,
+    start: stableDash?.start,
+    end: stableDash?.end,
+    tokenAddr: stableDash?.tokenAddr,
+    tokenPrice: stableDash?.tokenPrice,
+    tokensRemaining: stableDash?.tokensRemaining,
   });
 
   const statusPill =
@@ -113,133 +167,156 @@ export default function RaisedFunds() {
         : "bg-red-500/10 text-red-200 border-red-500/30";
 
   const expectedUsdt = getUsdtAddress(chainId);
-  const payToken = data?.payToken;
+  const payToken = stableDash?.payToken;
   const payTokenMismatch =
     !!expectedUsdt && !!payToken && expectedUsdt.toLowerCase() !== payToken.toLowerCase();
 
-  const isLoading = dashLoading || investorsLoading;
-
   return (
-    <div className="relative overflow-hidden rounded-xl md:rounded-2xl border border-slate-800 bg-gradient-to-b from-slate-950 to-black p-4 md:p-6 shadow-lg">
-      <div className="absolute inset-0 opacity-5 bg-[linear-gradient(45deg,transparent_25%,rgba(168,85,247,0.1)_50%,transparent_75%)] bg-[length:20px_20px]" />
-
+    <div className="relative overflow-hidden rounded-xl md:rounded-2xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl p-4 md:p-6 shadow-2xl">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+      
       <div className="relative space-y-5 md:space-y-6">
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg md:text-xl font-semibold">Funding Overview</h2>
-            <p className="text-xs md:text-sm text-gray-400 mt-0.5">
-              {data?.symbol ? `${data.symbol} Presale` : "Presale"}
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg md:text-xl font-semibold text-white">Funding Overview</h2>
+              {!isInitialLoading && hasInitialData && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg hover:bg-white/10 transition-all duration-200 disabled:opacity-50"
+                  aria-label="Refresh data"
+                >
+                  <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-gray-400 mt-1">
+              {stableDash?.symbol ? `${stableDash.symbol} Presale` : "Token Presale"}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${statusPill}`}>
-              {status.label}
-            </span>
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500/20 to-cyan-500/10 border border-purple-500/30">
-              <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-purple-300" />
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border ${statusPill}`}>
+              <div className={`w-2 h-2 rounded-full ${
+                status.tone === 'success' ? 'bg-emerald-400 animate-pulse' :
+                status.tone === 'warning' ? 'bg-amber-400' : 'bg-red-400'
+              }`} />
+              <span className="text-xs font-medium">{status.label}</span>
             </div>
           </div>
         </div>
 
+        {/* Payment Token Warning */}
         {payTokenMismatch && (
-          <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 md:p-4">
-            <AlertTriangle className="w-5 h-5 text-red-200 mt-0.5" />
-            <div className="text-sm text-red-100">
-              <div className="font-semibold">Payment token mismatch</div>
-              <div className="text-red-200/90">
-                The ICO contract payToken does not match the configured USDT address for this network. Disable buys until this is corrected.
+          <div className="rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/5 p-4 backdrop-blur-sm">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-red-200">Payment Token Mismatch</div>
+                <div className="mt-1 text-sm text-red-300/80">
+                  Contract payToken doesn't match configured USDT address
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        <div className="p-4 md:p-5 bg-black/40 rounded-xl border border-slate-800 backdrop-blur-sm">
+        {/* Current Price Card */}
+        <div className="group p-4 md:p-5 bg-gradient-to-br from-gray-900/50 to-black/30 rounded-xl border border-white/10 backdrop-blur-sm hover:border-purple-500/30 transition-all duration-300">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs md:text-sm text-gray-400">Current Price</p>
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="text-2xl md:text-3xl font-bold">
-                  {isLoading || !pricePay ? "—" : `${pricePay} ${paySymbol}`}
-                </span>
-                <span className="text-xs text-gray-400">per token</span>
-              </div>
+              <p className="text-sm text-gray-400">Current Price</p>
+              {isInitialLoading ? (
+                <div className="h-9 w-48 bg-gray-800/50 rounded-lg animate-pulse mt-1" />
+              ) : (
+                <div className="flex items-baseline gap-1.5 mt-1">
+                  <span className="text-2xl md:text-3xl font-bold text-white">
+                    {pricePay ? `${pricePay}` : "—"}
+                  </span>
+                  <span className="text-sm text-purple-300/80">{paySymbol}</span>
+                  <span className="text-xs text-gray-400">per token</span>
+                </div>
+              )}
             </div>
 
-            <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-cyan-500/30">
-              <span className="text-xs md:text-sm font-medium text-cyan-300">Fixed</span>
+            <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
+              <span className="text-xs font-medium text-purple-300">Fixed Price</span>
             </div>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-xs md:text-sm text-gray-400">Total Raised</span>
-            <span className="text-sm md:text-base font-semibold">
-              {isLoading ? "Loading..." : `${raisedPay} ${paySymbol}`}
-            </span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-xs md:text-sm text-gray-400">Total Tokens Sold</span>
-            <span className="text-sm md:text-base font-semibold">
-              {isLoading ? "Loading..." : `${totalTokensSoldHuman} ${data?.symbol ?? "TOKEN"}`}
-            </span>
-          </div>
-
-          <div className="relative h-2.5 md:h-3 rounded-full bg-slate-900 overflow-hidden">
-            <div
-              className="absolute h-full rounded-full bg-gradient-to-r from-purple-500 to-cyan-400 transition-all duration-700"
-              style={{ width: `${progress === null ? 0 : progressSafe}%` }}
-            />
-          </div>
-
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>0</span>
-            <span>{targetLabel}</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
-          <div className="p-3 md:p-4 bg-black/30 rounded-xl border border-slate-800">
+        <div className="space-y-4">
+          {/* Total Raised */}
+          {/* <div className="flex justify-between items-center p-4 bg-gradient-to-br from-gray-900/30 to-black/20 rounded-xl border border-white/10">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-cyan-500/10">
-                <Target className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
+              <div className="p-2 rounded-lg bg-gradient-to-br from-green-500/20 to-emerald-600/20">
+                <DollarSign className="w-4 h-4 text-green-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-400">Unique Buyers</p>
-                <p className="text-lg md:text-xl font-bold mt-0.5">
-                  {isLoading ? "—" : investorsCount}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  Recent range
-                </p>
+                <p className="text-sm text-gray-400">Total Raised</p>
+                {isInitialLoading ? (
+                  <div className="h-6 w-32 bg-gray-800/50 rounded animate-pulse mt-1" />
+                ) : (
+                  <p className="text-lg font-semibold text-white">
+                    {raisedPay} <span className="text-sm text-green-300/80">{paySymbol}</span>
+                  </p>
+                )}
               </div>
             </div>
-          </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-400">Progress</div>
+              {isInitialLoading ? (
+                <div className="h-6 w-16 bg-gray-800/50 rounded animate-pulse mt-1" />
+              ) : (
+                <p className="text-lg font-semibold text-white">
+                  {progress === null ? "N/A" : `${progressSafe.toFixed(1)}%`}
+                </p>
+              )}
+            </div>
+          </div> */}
 
-          <div className="p-3 md:p-4 bg-black/30 rounded-xl border border-slate-800">
+          {/* Total Tokens Sold */}
+          <div className="flex justify-between items-center p-4 bg-gradient-to-br from-gray-900/30 to-black/20 rounded-xl border border-white/10">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Globe className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-600/20">
+                <TrendingUp className="w-4 h-4 text-blue-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-400">Network</p>
-                <p className="text-lg md:text-xl font-bold mt-0.5">
-                 {chainId === bsc.id ? "BSC" : chain?.name ?? "—"}
-
-                </p>
-                <p className="text-[11px] text-gray-500 mt-0.5">Chain ID: {chainId}</p>
+                <p className="text-sm text-gray-400">Tokens Sold</p>
+                {isInitialLoading ? (
+                  <div className="h-6 w-40 bg-gray-800/50 rounded animate-pulse mt-1" />
+                ) : (
+                  <p className="text-lg font-semibold text-white">
+                    {totalTokensSoldHuman} <span className="text-sm text-blue-300/80">{stableDash?.symbol ?? "TOKEN"}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="p-3 md:p-4 bg-gradient-to-r from-slate-900/50 to-black/50 rounded-xl border border-slate-800">
-          <p className="text-xs md:text-sm text-gray-300 leading-relaxed">
-            Presale closes when the hard cap is reached (USDT or tokens) or the sale window ends (if configured).
+         </div>
+        {/* Info Box */}
+        <div className="p-4 bg-gradient-to-r from-gray-900/30 to-black/30 rounded-xl border border-white/10">
+          <p className="text-sm text-gray-300 leading-relaxed">
+            Presale closes when the hard cap is reached or the sale window ends.
+            {hasTokenCap && ` Token cap: ${trimDecimals(formatUnits(hardCapTokensRaw, tokenDecimals), 2)} ${stableDash?.symbol}`}
+            {hasUsdtCap && ` USDT cap: ${trimDecimals(formatUnits(hardCapUsdtRaw, payDecimals), 2)} ${paySymbol}`}
           </p>
         </div>
+
+        {/* Last Updated */}
+        {!isInitialLoading && hasInitialData && (
+          <div className="text-xs text-gray-500/60 text-center pt-2">
+            <div className="flex items-center justify-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-400/50 animate-pulse" />
+              <span>Live updates</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
