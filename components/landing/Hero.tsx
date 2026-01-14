@@ -128,7 +128,7 @@ const Hero = () => {
           <>
             <Wallet className="w-5 h-5 text-purple-300" />
             <span className="text-base sm:text-lg font-semibold text-gray-200">
-              Add to MetaMask
+              Add $AERA to MetaMask
             </span>
           </>
         );
