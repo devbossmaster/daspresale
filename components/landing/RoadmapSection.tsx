@@ -12,7 +12,7 @@ const RoadmapSection = () => {
     {
       phase: "Phase 1",
       title: "Foundation",
-      period: "Q1–Q2 2025",
+      period: "Q1–Q2 2026",
       items: [
         "Token deployment & audit",
         "Website + brand launch",
@@ -25,7 +25,7 @@ const RoadmapSection = () => {
     {
       phase: "Phase 2",
       title: "Ecosystem Growth",
-      period: "Q3–Q4 2025",
+      period: "Q3–Q4 2026",
       items: [
         "AI Trading Hub beta",
         "Travel marketplace MVP",
@@ -37,7 +37,7 @@ const RoadmapSection = () => {
     {
       phase: "Phase 3",
       title: "Expansion",
-      period: "2025",
+      period: "2026",
       items: [
         "Real-estate tokenization pilot",
         "100,000+ holders",
@@ -49,7 +49,7 @@ const RoadmapSection = () => {
     {
       phase: "Phase 4",
       title: "Mass Adoption",
-      period: "2026",
+      period: "2027",
       items: [
         "Global ambassador program",
         "AI super-app integration",

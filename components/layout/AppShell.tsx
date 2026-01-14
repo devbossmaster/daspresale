@@ -9,27 +9,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-[#05030B] overflow-hidden">
-      {/* Background layers */}
       <div className="pointer-events-none fixed inset-0 opacity-60 bg-gradient-to-br from-[#0f172a] via-[#020617] to-[#020617] animate-gradient" />
       <div className="pointer-events-none fixed inset-x-0 top-8 h-64 bg-gradient-to-b from-purple-500/20 via-transparent to-transparent" />
 
-      {/* Fixed Header - Always on top */}
       <Header onMenuClick={() => setSidebarOpen(true)} />
 
-      {/* Mobile overlay */}
+      {/* ✅ Mobile overlay only */}
       <div
-        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden ${
+        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity md:hidden ${
           sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={() => setSidebarOpen(false)}
       />
 
-      {/* Main layout with padding for fixed header */}
-      <div className="relative flex min-h-screen pt-16"> {/* Added pt-16 for header height */}
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="relative flex min-h-screen pt-16">
+        {/* ✅ Sidebar exists ONLY on mobile */}
+        <div className="md:hidden">
+          <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        </div>
 
-        {/* Main content area - scrolls under header */}
-        <div className="min-w-0 flex-1 flex flex-col overflow-y-auto"> {/* Added overflow-y-auto */}
+        <div className="min-w-0 flex-1 flex flex-col overflow-y-auto">
           <main className="flex-1 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             <div className="w-full max-w-6xl mx-auto min-w-0">{children}</div>
           </main>
