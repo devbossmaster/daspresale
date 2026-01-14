@@ -11,16 +11,20 @@ module.exports = {
       fontFamily: {
         orbitron: ['var(--font-orbitron)', 'sans-serif'],
       },
-      animation: {
-        'pulse-slow': 'pulse 3s ease-in-out infinite',
-        'float': 'float 6s ease-in-out infinite',
+        animation: {
+        'gradient-shine': 'gradient-shine 3s ease infinite',
+        'float': 'float 3s ease-in-out infinite',
       },
       keyframes: {
-        float: {
+        'gradient-shine': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        'float': {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-20px)' },
         }
-      }
+      },
     },
   },
   plugins: [],
