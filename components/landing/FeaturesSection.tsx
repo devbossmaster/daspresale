@@ -57,7 +57,7 @@ const FeaturesSection = () => {
     <section
       id="features"
       ref={ref}
-      className="relative cutive overflow-hidden mt-12"
+      className="relative overflow-hidden mt-12"
     >
       {/* subtle bg */}
       <div className="pointer-events-none absolute inset-0 -z-10">

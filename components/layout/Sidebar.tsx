@@ -76,7 +76,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const adminNavigation: NavItem[] = useMemo(
     () => [
       { name: "Admin Panel", href: "/admin/admin-overview", icon: Shield, description: "System administration" },
-      { name: "Withdrawals", href: "/admin/withdraw-tokens", icon: Wallet, description: "Token withdrawal" },
+      { name: "Token Managment", href: "/admin/withdraw-tokens", icon: Wallet, description: "Token withdrawal" },
+      { name: "Fund Managment", href: "/admin/withdraw-usdt", icon: Wallet, description: "Fund withdrawal" },
     ],
     []
   );
@@ -167,7 +168,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed lg:static cutive inset-y-0 left-0 z-50 lg:z-auto",
+          "fixed lg:static inset-y-0 left-0 z-50 lg:z-auto",
           "w-72 bg-gradient-to-b from-gray-950 via-gray-900 to-black text-gray-100",
           "border-r border-gray-800/50 shadow-2xl shadow-black/30",
           "transform transition-all duration-300 ease-out",
