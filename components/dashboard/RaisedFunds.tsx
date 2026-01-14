@@ -244,7 +244,7 @@ export default function RaisedFunds() {
             </div>
 
             <div className="px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30">
-              <span className="text-xs font-medium text-purple-300">Fixed Price</span>
+              <span className="text-xs font-medium text-purple-300">Price</span>
             </div>
           </div>
         </div>
