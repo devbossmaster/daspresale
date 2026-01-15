@@ -281,6 +281,19 @@ export const tokenIcoAbi = [
       "anonymous": false,
       "inputs": [
         {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newImplementation",
+          "type": "address"
+        }
+      ],
+      "name": "ImplementationUpgraded",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": false,
           "internalType": "uint64",
           "name": "version",
@@ -358,6 +371,25 @@ export const tokenIcoAbi = [
         }
       ],
       "name": "PriceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "usdt",
+          "type": "address"
+        }
+      ],
+      "name": "ProxyInitialized",
       "type": "event"
     },
     {
@@ -676,17 +708,17 @@ export const tokenIcoAbi = [
       "outputs": [
         {
           "internalType": "address",
-          "name": "tokenAddr",
+          "name": "saleTokenAddr",
           "type": "address"
         },
         {
           "internalType": "string",
-          "name": "symbol",
+          "name": "saleSymbol",
           "type": "string"
         },
         {
           "internalType": "uint8",
-          "name": "decimals",
+          "name": "saleDecimals",
           "type": "uint8"
         },
         {
@@ -703,6 +735,31 @@ export const tokenIcoAbi = [
           "internalType": "uint256",
           "name": "usdtRaised",
           "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "payTokenAddr",
+          "type": "address"
+        },
+        {
+          "internalType": "uint8",
+          "name": "payTokenDecimals",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "treasuryWallet",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "saleWindowEnabled",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "saleActive",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
