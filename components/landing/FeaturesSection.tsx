@@ -11,39 +11,31 @@ const FeaturesSection = () => {
   const features = [
     {
       icon: "🤖",
-      title: "AI Trading Hub",
+      title: "De-Fi Projects",
       description:
-        "AI-driven signals, automated bots and copy-trading with subscriptions payable in $AERA.",
+        "De-Fi Projects, with subscriptions payable in $AERA.",
       gradient: "from-[#FF6FD8] to-[#FFB86C]",
-    },
-    {
-      icon: "✈️",
-      title: "Travel Marketplace",
-      description:
-        "Web3-native booking portal for flights, hotels and packages with loyalty rewards.",
-      gradient: "from-[#6F8BFF] to-[#8F8CFF]",
     },
     {
       icon: "🎓",
       title: "Digital Academy",
       description:
-        "Premium education in trading, business and real estate with revenue sharing to holders.",
+        "Premium education in trading, business and real estate.",
       gradient: "from-[#FFB86C] to-[#FF6FD8]",
     },
     {
       icon: "🏠",
-      title: "Real Estate Tokenization",
+      title: "Real Estate Projects",
       description:
         "Fractional ownership of global properties with rental yields distributed in $AERA.",
       gradient: "from-[#8F8CFF] to-[#6F8BFF]",
     },
-    {
-      icon: "🎮",
-      title: "Gaming & Engagement",
-      description:
-        "Play-to-earn loops, quests, leaderboards and spin-to-win mechanics.",
-      gradient: "from-[#FF6FD8] to-[#8F8CFF]",
-    },
+   {
+    icon: "🎮",
+    title: "Play-to-Earn Gaming",
+    description: "Web3 gaming ecosystem with NFTs, leaderboards, and token rewards for competitive gameplay.",
+    gradient: "from-[#EC4899] to-[#8B5CF6]",
+  },
     {
       icon: "💰",
       title: "Staking Vault",

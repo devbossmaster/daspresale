@@ -463,7 +463,7 @@ export default function TransferForm() {
             ) : (
               <>
                 <div className="text-3xl font-bold text-white mb-2">
-                  {formatDecimalStr(balanceHuman, 6)} <span className="text-cyan-300">{symbol}</span>
+                  {formatDecimalStr(balanceHuman, 1)} <span className="text-cyan-300">{symbol}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-400">

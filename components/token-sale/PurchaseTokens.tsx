@@ -339,7 +339,7 @@ export default function PurchaseTokens() {
   }, [usdtAmount, tokenPrice, tokenDecimals]);
 
   const tokensHuman = useMemo(() => {
-    return formatDecimalStr(formatUnits(tokensToReceive, tokenDecimals), 6);
+    return formatDecimalStr(formatUnits(tokensToReceive, tokenDecimals), 2);
   }, [tokensToReceive, tokenDecimals]);
 
   // 1 USDT -> X tokens
@@ -509,11 +509,11 @@ export default function PurchaseTokens() {
   }
 
   const balanceHuman = useMemo(() => {
-    return formatDecimalStr(formatUnits(usdtBal, payDecimals), 6);
+    return formatDecimalStr(formatUnits(usdtBal, payDecimals), 2);
   }, [usdtBal, payDecimals]);
 
   const maxSpendHuman = useMemo(() => {
-    return formatDecimalStr(formatUnits(maxSpend, payDecimals), 6);
+    return formatDecimalStr(formatUnits(maxSpend, payDecimals), 2);
   }, [maxSpend, payDecimals]);
 
   const saleWindowText = useMemo(() => {
@@ -800,12 +800,12 @@ export default function PurchaseTokens() {
             <div className="p-3 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
               <div className="text-xs text-gray-400 mb-1">Your Contribution</div>
               <div className="font-medium text-white">
-                {formatDecimalStr(formatUnits(contributedStable, payDecimals), 6)} {paySymbol}
+                {formatDecimalStr(formatUnits(contributedStable, payDecimals), 2)} {paySymbol}
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 {maxBuyUSDT === 0n 
                   ? 'No wallet limit'
-                  : `Limit: ${formatDecimalStr(formatUnits(maxBuyUSDT, payDecimals), 6)} ${paySymbol}`
+                  : `Limit: ${formatDecimalStr(formatUnits(maxBuyUSDT, payDecimals), 0)} ${paySymbol}`
                 }
               </div>
             </div>
@@ -829,7 +829,7 @@ export default function PurchaseTokens() {
             <div className="p-3 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
               <div className="text-xs text-gray-400 mb-1">Allowance</div>
               <div className="font-medium text-white">
-                {formatDecimalStr(formatUnits(allowance, payDecimals), 6)} {paySymbol}
+                {formatDecimalStr(formatUnits(allowance, payDecimals), 2)} {paySymbol}
               </div>
               <div className="text-xs text-gray-500 mt-1">
                 {needsApproval ? 'Requires approval' : 'Sufficient allowance'}

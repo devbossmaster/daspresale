@@ -180,8 +180,8 @@ export default function TransactionPage() {
   // Prepare transactions for display
   const txs = useMemo(() => {
     return rows.map((r) => {
-      const paid = formatDecimalStr(formatUnits(r.amountPaid, payDecimals), 4);
-      const bought = formatDecimalStr(formatUnits(r.tokensBought, tokenDecimals), 4);
+      const paid = formatDecimalStr(formatUnits(r.amountPaid, payDecimals), 2);
+      const bought = formatDecimalStr(formatUnits(r.tokensBought, tokenDecimals), 1);
       const { date, time, full } = mounted ? formatDateTimeClient(r.timestamp) : { date: "—", time: "—", full: "—" };
 
       const txUrl = explorerBase ? `${explorerBase}/tx/${r.txHash}` : undefined;
@@ -297,7 +297,7 @@ export default function TransactionPage() {
         )}
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-8">
           <div className="p-5 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-900/30 to-cyan-900/10">
@@ -319,8 +319,7 @@ export default function TransactionPage() {
             <div className="text-2xl sm:text-3xl font-bold text-white">{stats.uniqueBuyers}</div>
             <div className="text-xs text-gray-500 mt-2">Distinct wallets</div>
           </div>
-
-          <div className="p-5 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-sm">
+          {/* <div className="p-5 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 rounded-lg bg-gradient-to-br from-blue-900/30 to-blue-900/10">
                 <DollarSign className="w-5 h-5 text-blue-400" />
@@ -341,7 +340,8 @@ export default function TransactionPage() {
             <div className="text-2xl sm:text-3xl font-bold text-white">{stats.latestTx}</div>
             <div className="text-xs text-gray-500 mt-2">Most recent purchase</div>
           </div>
-        </div>
+        </div> */}
+      </div>
 
         {/* Main Transaction Card */}
         <div className="rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-xl shadow-2xl overflow-hidden">

@@ -116,8 +116,8 @@ export default function RecentTransactions() {
       return {
         date: `${date} ${time}`,
         buyerShort: shortAddr(r.buyer),
-        paid: `${formatDecimalStr(formatUnits(r.amountPaid, payDecimals), 4)} ${paySymbol}`,
-        tokens: `${formatDecimalStr(formatUnits(r.tokensBought, tokenDecimals), 4)} ${tokenSymbol}`,
+        paid: `${formatDecimalStr(formatUnits(r.amountPaid, payDecimals), 2)} ${paySymbol}`,
+        tokens: `${formatDecimalStr(formatUnits(r.tokensBought, tokenDecimals), 2)} ${tokenSymbol}`,
         status: "Complete",
         txUrl: explorerBase ? `${explorerBase}/tx/${r.txHash}` : undefined,
         txHash: r.txHash,
@@ -130,7 +130,7 @@ export default function RecentTransactions() {
     const volTokens = rows.reduce((acc, r) => acc + r.tokensBought, 0n);
     return {
       totalTx,
-      volTokensHuman: formatDecimalStr(formatUnits(volTokens, tokenDecimals), 4),
+      volTokensHuman: formatDecimalStr(formatUnits(volTokens, tokenDecimals), 1),
     };
   }, [txs.length, rows, tokenDecimals]);
 

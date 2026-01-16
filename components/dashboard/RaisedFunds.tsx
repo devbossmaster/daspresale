@@ -125,7 +125,7 @@ export default function RaisedFunds() {
 
   const tokenDecimals = stableDash?.decimals ?? 18;
   const totalTokensSoldHuman = useMemo(() => {
-    return trimDecimals(formatUnits(totalTokensSoldRaw, tokenDecimals), 4);
+    return trimDecimals(formatUnits(totalTokensSoldRaw, tokenDecimals), 1);
   }, [totalTokensSoldRaw, tokenDecimals]);
 
   const hasTokenCap = hardCapTokensRaw > 0n;

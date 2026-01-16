@@ -256,7 +256,7 @@ export default function OverviewTab() {
   }, [myRows]);
 
   const spentHuman = useMemo(() => formatDecimalStr(formatUnits(totals.spent, payDecimals), 2), [totals.spent, payDecimals]);
-  const boughtHuman = useMemo(() => formatDecimalStr(formatUnits(totals.bought, tokenDecimals), 4), [totals.bought, tokenDecimals]);
+  const boughtHuman = useMemo(() => formatDecimalStr(formatUnits(totals.bought, tokenDecimals), 1), [totals.bought, tokenDecimals]);
   const recent = useMemo(() => myRows.slice(0, 3), [myRows]);
 
   // Loading behavior:
@@ -476,7 +476,7 @@ export default function OverviewTab() {
 
                       <div className="text-right">
                         <div className="font-bold text-lg text-cyan-300">
-                          {formatDecimalStr(formatUnits(p.tokensBought, tokenDecimals), 4)} {tokenSymbol}
+                          {formatDecimalStr(formatUnits(p.tokensBought, tokenDecimals), 1)} {tokenSymbol}
                         </div>
                         <div className="text-sm text-gray-400">
                           Paid: {formatDecimalStr(formatUnits(p.amountPaid, payDecimals), 2)} {paySymbol}

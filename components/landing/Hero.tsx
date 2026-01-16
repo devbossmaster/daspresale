@@ -201,10 +201,10 @@ const Hero = () => {
                        max-w-3xl mx-auto leading-relaxed"
           >
             Staera revolutionizes the blockchain space by unifying{" "}
-            <span className="font-semibold text-cyan-300">AI trading</span>,{" "}
-            <span className="font-semibold text-purple-300">travel</span>,{" "}
-            <span className="font-semibold text-purple-300">real-estate</span>, and{" "}
-            <span className="font-semibold text-purple-300">gaming</span> into a single,
+            <span className="font-semibold text-cyan-300">De-fi</span>,{" "}
+            <span className="font-semibold text-purple-300">AI Projects</span>,{" "}
+            <span className="font-semibold text-purple-300">Real-World Assets</span>, and{" "}
+            <span className="font-semibold text-purple-300">Web3 Gaming</span> into a single,
             seamless <span className="font-bold text-blue-300">$AERA</span> powered experience.
           </motion.p>
 

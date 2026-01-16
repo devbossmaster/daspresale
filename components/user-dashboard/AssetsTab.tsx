@@ -87,8 +87,8 @@ export default function AssetsTab() {
   const stableDash = hasInitialData ? (dash || cachedDashboard) : dash
   const stableTokenBal = hasInitialData ? (tokenBalRead.data || 0n) : (tokenBalRead.data || 0n)
   const stableUsdtBal = hasInitialData ? (usdtBalRead.data || 0n) : (usdtBalRead.data || 0n)
-  const stableTokenBalHuman = hasInitialData ? (formatDecimalStr(formatUnits(stableTokenBal, tokenDecimals), 4) || cachedTokenBalance) : '—'
-  const stableUsdtBalHuman = hasInitialData ? (formatDecimalStr(formatUnits(stableUsdtBal, payDecimals), 4) || cachedUsdtBalance) : '—'
+  const stableTokenBalHuman = hasInitialData ? (formatDecimalStr(formatUnits(stableTokenBal, tokenDecimals), 1) || cachedTokenBalance) : '—'
+  const stableUsdtBalHuman = hasInitialData ? (formatDecimalStr(formatUnits(stableUsdtBal, payDecimals), 2) || cachedUsdtBalance) : '—'
 
   // Handle manual refresh
   const handleRefresh = async () => {

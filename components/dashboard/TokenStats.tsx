@@ -149,7 +149,16 @@ export default function TokenStats() {
   }, [raisedRaw, payDecimals]);
 
   const remainingHuman = stableDash?.tokensRemainingHuman ?? "—";
+   // Display formatting (max 1 decimal)
+  const userBalDisplay = useMemo(() => {
+    if (!stableUserBal || stableUserBal === "—") return "—";
+    return trimDecimals(String(stableUserBal), 1);
+  }, [stableUserBal]);
 
+  const remainingDisplay = useMemo(() => {
+    if (!remainingHuman || remainingHuman === "—") return "—";
+    return trimDecimals(String(remainingHuman), 1);
+  }, [remainingHuman]);
   const progress = stableDash?.progressPct ?? null;
   const progressSafe = progress === null ? 0 : clamp(progress);
 
@@ -257,7 +266,7 @@ export default function TokenStats() {
                     ) : (
                       <>
                         <p className="text-xl md:text-2xl font-bold text-white">
-                          {stableUserBal}
+                          {userBalDisplay}
                         </p>
                         <span className="text-base text-cyan-300/80">{symbol}</span>
                       </>
@@ -313,7 +322,7 @@ export default function TokenStats() {
                   ) : (
                     <>
                       <p className="text-xl md:text-2xl font-bold text-white">
-                        {remainingHuman}
+                        {remainingDisplay}
                       </p>
                       <span className="text-base text-emerald-300/80">{symbol}</span>
                     </>

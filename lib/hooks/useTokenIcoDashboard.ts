@@ -181,7 +181,7 @@ export function useTokenIcoDashboard() {
   const userBalHuman = useMemo(() => {
     if (!parsed) return "—";
     if (userTokenBalance.data === undefined) return "—";
-    return fmtNum(formatUnits(userTokenBalance.data as bigint, parsed.decimals), 4);
+    return fmtNum(formatUnits(userTokenBalance.data as bigint, parsed.decimals), 1);
   }, [userTokenBalance.data, parsed]);
 
   // Combined refetch function
