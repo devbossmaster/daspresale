@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Send, Copy, Check, ExternalLink, AlertCircle, RefreshCw, Wallet, Shield } from "lucide-react";
+import {
+  Send,
+  Copy,
+  Check,
+  ExternalLink,
+  AlertCircle,
+  RefreshCw,
+  Wallet,
+  Shield,
+} from "lucide-react";
 import {
   useAccount,
   useChainId,
@@ -108,7 +117,6 @@ export default function TransferForm() {
 
   const chains = useChains();
   const chain = chains.find((c) => c.id === chainId);
-
   const explorerBase = onBsc ? chain?.blockExplorers?.default?.url : undefined;
 
   // Caching states
@@ -117,11 +125,11 @@ export default function TransferForm() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Dashboard data with caching
-  const { 
-    data: dashLive, 
-    error: dashError, 
+  const {
+    data: dashLive,
+    error: dashError,
     isLoading: dashLoadingLive,
-    refetch: refetchDashboard 
+    refetch: refetchDashboard,
   } = useTokenIcoDashboard();
 
   useEffect(() => {
@@ -150,8 +158,8 @@ export default function TransferForm() {
     address: tokenIsValid ? tokenAddr : undefined,
     abi: erc20Abi,
     functionName: "symbol",
-    query: { 
-      enabled: tokenIsValid && onBsc, 
+    query: {
+      enabled: tokenIsValid && onBsc,
       refetchOnWindowFocus: false,
       staleTime: 30000,
     },
@@ -161,14 +169,13 @@ export default function TransferForm() {
     address: tokenIsValid ? tokenAddr : undefined,
     abi: erc20Abi,
     functionName: "decimals",
-    query: { 
-      enabled: tokenIsValid && onBsc, 
+    query: {
+      enabled: tokenIsValid && onBsc,
       refetchOnWindowFocus: false,
       staleTime: 30000,
     },
   });
 
-  // Update cache when data arrives
   useEffect(() => {
     if (tokenSymbolRead.data && !tokenSymbolRead.isLoading) {
       setCachedSymbol(tokenSymbolRead.data as string);
@@ -176,21 +183,26 @@ export default function TransferForm() {
     if (tokenDecimalsRead.data && !tokenDecimalsRead.isLoading) {
       setCachedDecimals(tokenDecimalsRead.data as number);
     }
-  }, [tokenSymbolRead.data, tokenSymbolRead.isLoading, tokenDecimalsRead.data, tokenDecimalsRead.isLoading]);
+  }, [
+    tokenSymbolRead.data,
+    tokenSymbolRead.isLoading,
+    tokenDecimalsRead.data,
+    tokenDecimalsRead.isLoading,
+  ]);
 
   const decimals = tokenDecimalsRead.data || cachedDecimals || dash?.decimals || 18;
   const symbol = tokenSymbolRead.data || cachedSymbol || dash?.symbol || "TOKEN";
 
   // Balance with caching
   const [cachedBalance, setCachedBalance] = useState<bigint>(0n);
-  
+
   const balanceRead = useReadContract({
     address: tokenIsValid ? tokenAddr : undefined,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { 
-      enabled: !!address && tokenIsValid && onBsc, 
+    query: {
+      enabled: !!address && tokenIsValid && onBsc,
       refetchOnWindowFocus: false,
       staleTime: 8000,
     },
@@ -250,7 +262,6 @@ export default function TransferForm() {
     }
   };
 
-  // Handle refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -268,7 +279,8 @@ export default function TransferForm() {
   };
 
   const canTransfer = useMemo(() => {
-    return onBsc &&
+    return (
+      onBsc &&
       !!address &&
       tokenIsValid &&
       recipientValid &&
@@ -277,8 +289,20 @@ export default function TransferForm() {
       hasEnough &&
       !isPending &&
       !receipt.isLoading &&
-      !amountError;
-  }, [onBsc, address, tokenIsValid, recipientValid, notSelf, hasAmount, hasEnough, isPending, receipt.isLoading, amountError]);
+      !amountError
+    );
+  }, [
+    onBsc,
+    address,
+    tokenIsValid,
+    recipientValid,
+    notSelf,
+    hasAmount,
+    hasEnough,
+    isPending,
+    receipt.isLoading,
+    amountError,
+  ]);
 
   async function handleTransfer() {
     setUiError(null);
@@ -298,7 +322,6 @@ export default function TransferForm() {
         args: [recipient as `0x${string}`, amountRaw],
       });
 
-      // Clear amount on success, keep recipient
       setAmountText("");
     } catch (e: any) {
       setUiError(humanizeTxError(e));
@@ -310,374 +333,396 @@ export default function TransferForm() {
 
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
+      <div className="flex items-center justify-center h-56 sm:h-64">
+        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-cyan-500" />
       </div>
     );
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-xl shadow-2xl">
-      {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
-      
-      <div className="relative p-5 sm:p-6 lg:p-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-6 sm:mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30">
-              <Send className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+    // ✅ Center + responsive padding + max width
+    <div className="w-full px-3 sm:px-4 md:px-0">
+      <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-xl shadow-2xl">
+        {/* Animated background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+
+        <div className="relative p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="shrink-0 p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30">
+                <Send className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-white truncate">
+                  Transfer Tokens
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-400 truncate">
+                  Send {symbol} to another wallet
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white">Transfer Tokens</h2>
-              <p className="text-sm text-gray-400">
-                Send {symbol} to another wallet
-              </p>
+
+            {hasInitialData && !dashLoading && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="self-start sm:self-auto p-2 rounded-lg hover:bg-white/10 transition-all duration-200 disabled:opacity-50 group"
+                aria-label="Refresh data"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 text-gray-400 group-hover:text-blue-400 ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                />
+              </button>
+            )}
+          </div>
+
+          {/* Error Messages */}
+          {(uiError || dashError || writeError) && (
+            <div className="mb-6 rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/5 p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-red-200">Transfer Failed</div>
+                  <div className="mt-1 text-sm text-red-300/80 break-words">
+                    {uiError ||
+                      humanizeTxError(writeError) ||
+                      "Unable to load token data. Please try again."}
+                  </div>
+                  {uiErrorDetails && (
+                    <details className="mt-2">
+                      <summary className="text-xs text-red-300/60 cursor-pointer select-none">
+                        Show details
+                      </summary>
+                      <div className="mt-2 text-xs text-red-300/50 whitespace-pre-wrap break-words">
+                        {uiErrorDetails}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Network Warning */}
+          {!onBsc && isConnected && (
+            <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-amber-200">Wrong Network</div>
+                  <div className="mt-1 text-sm text-amber-300/80 break-words">
+                    Please switch to BSC Mainnet to transfer tokens
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!address && (
+            <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <Wallet className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-amber-200">Wallet Not Connected</div>
+                  <div className="mt-1 text-sm text-amber-300/80 break-words">
+                    Connect your wallet to transfer tokens
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Token Information */}
+          {/* ✅ 1 col on mobile, 2 on sm, 3 on lg */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
+              <div className="text-xs text-gray-400 mb-2">Token</div>
+              <div className="text-lg font-bold text-white break-words">{symbol}</div>
+              <div className="text-xs text-gray-500 mt-1">ERC-20 Token</div>
+            </div>
+
+            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
+              <div className="text-xs text-gray-400 mb-2">Decimals</div>
+              <div className="text-lg font-bold text-white">{decimals}</div>
+              <div className="text-xs text-gray-500 mt-1">Token precision</div>
+            </div>
+
+            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
+              <div className="text-xs text-gray-400 mb-2">Network</div>
+              <div className={`text-lg font-bold ${onBsc ? "text-emerald-400" : "text-amber-400"}`}>
+                {onBsc ? "BSC Mainnet" : "Wrong Network"}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Chain ID: {chainId}</div>
             </div>
           </div>
-          
-          {hasInitialData && !dashLoading && (
+
+          {/* Token Address */}
+          <div className="mb-6">
+            {/* ✅ stack on mobile */}
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-base font-semibold text-white">Token Address</h3>
+
+              {tokenIsValid && (
+                <button
+                  onClick={handleCopyTokenAddress}
+                  className="w-full sm:w-auto text-xs px-3 py-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 transition-colors flex items-center justify-center gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
+              <div className="font-mono text-xs sm:text-sm break-all text-gray-300">
+                {tokenAddr || "Token address not available"}
+              </div>
+            </div>
+          </div>
+
+          {/* Balance Card */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold text-white mb-3">Your Balance</h3>
+            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-blue-900/20 to-cyan-900/20">
+              {balanceLoading ? (
+                <div className="h-10 sm:h-12 w-44 sm:w-48 bg-gray-800/50 rounded-lg animate-pulse" />
+              ) : (
+                <>
+                  {/* ✅ responsive text size + break words */}
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-2 break-words">
+                    {formatDecimalStr(balanceHuman, 6)}{" "}
+                    <span className="text-cyan-300">{symbol}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs text-gray-400">Available for transfer</div>
+                    <button
+                      onClick={() => {
+                        if (balanceHuman !== "—") setAmountText(balanceHuman);
+                      }}
+                      disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
+                      className="w-full sm:w-auto text-sm px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 disabled:opacity-50 rounded-lg transition-all duration-200"
+                    >
+                      Use Max
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Recipient */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold text-white mb-3">Recipient Address</h3>
+            <div className="relative">
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value.trim())}
+                className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl font-mono text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
+                placeholder="0x..."
+                spellCheck={false}
+                autoComplete="off"
+                disabled={!address}
+              />
+              {explorerBase && recipientValid && (
+                <a
+                  href={`${explorerBase}/address/${recipient}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-lg"
+                  title="View address on explorer"
+                >
+                  <ExternalLink className="w-4 h-4 text-gray-400" />
+                </a>
+              )}
+            </div>
+
+            {recipient.length > 0 && !recipientValid && (
+              <div className="mt-2 text-xs text-red-400 flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Invalid recipient address
+              </div>
+            )}
+            {recipientValid && !notSelf && (
+              <div className="mt-2 text-xs text-amber-400 flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Cannot send to your own address
+              </div>
+            )}
+          </div>
+
+          {/* Amount */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold text-white mb-3">Amount to Transfer</h3>
+            <div className="relative mb-4">
+              <input
+                inputMode="decimal"
+                type="text"
+                value={normalizedAmount}
+                onChange={(e) => setAmountText(e.target.value)}
+                className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-lg sm:text-xl font-bold text-right text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
+                placeholder="0.0"
+                spellCheck={false}
+                autoComplete="off"
+                disabled={!address}
+              />
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm sm:text-base">
+                {symbol}
+              </div>
+            </div>
+
+            {/* ✅ wrap controls on small screens */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    if (balanceHuman !== "—") {
+                      const half = (parseFloat(balanceHuman) / 2).toString();
+                      setAmountText(half);
+                    }
+                  }}
+                  disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
+                  className="flex-1 sm:flex-none px-3 py-2 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  50%
+                </button>
+                <button
+                  onClick={() => {
+                    if (balanceHuman !== "—") setAmountText(balanceHuman);
+                  }}
+                  disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
+                  className="flex-1 sm:flex-none px-3 py-2 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  MAX
+                </button>
+              </div>
+
+              {normalizedAmount && (
+                <button
+                  onClick={() => setAmountText("")}
+                  className="text-xs text-gray-400 hover:text-white transition-colors self-end sm:self-auto"
+                  type="button"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {amountError && <div className="mt-2 text-xs text-red-400">{amountError}</div>}
+            {!amountError && normalizedAmount && hasAmount && !hasEnough && (
+              <div className="mt-2 text-xs text-red-400">Amount exceeds your available balance</div>
+            )}
+          </div>
+
+          {/* Transfer Button */}
+          <div className="pt-4 border-t border-white/10">
             <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2 rounded-lg hover:bg-white/10 transition-all duration-200 disabled:opacity-50 group"
-              aria-label="Refresh data"
+              onClick={handleTransfer}
+              disabled={!canTransfer}
+              className={`
+                w-full rounded-xl font-bold transition-all duration-300
+                flex items-center justify-center gap-3
+                py-3 sm:py-4 text-base sm:text-lg
+                ${
+                  !canTransfer
+                    ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-400 hover:to-cyan-500 text-white hover:shadow-xl hover:-translate-y-0.5"
+                }
+              `}
+              type="button"
             >
-              <RefreshCw className={`w-4 h-4 text-gray-400 group-hover:text-blue-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isPending ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  Confirming in wallet...
+                </div>
+              ) : receipt.isLoading ? (
+                <div className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  Waiting for confirmation...
+                </div>
+              ) : !address ? (
+                <div className="flex items-center justify-center gap-3">
+                  <Wallet className="w-5 h-5" />
+                  Connect Wallet to Transfer
+                </div>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  Transfer {normalizedAmount ? `${normalizedAmount} ${symbol}` : symbol}
+                </>
+              )}
             </button>
-          )}
-        </div>
 
-        {/* Error Messages */}
-        {(uiError || dashError || writeError) && (
-          <div className="mb-6 rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/5 p-4 backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-medium text-red-200">Transfer Failed</div>
-                <div className="mt-1 text-sm text-red-300/80">
-                  {uiError || humanizeTxError(writeError) || "Unable to load token data. Please try again."}
-                </div>
-                {uiErrorDetails && (
-                  <details className="mt-2">
-                    <summary className="text-xs text-red-300/60 cursor-pointer select-none">Show details</summary>
-                    <div className="mt-2 text-xs text-red-300/50 whitespace-pre-wrap break-words">
-                      {uiErrorDetails}
-                    </div>
-                  </details>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Network Warning */}
-        {!onBsc && isConnected && (
-          <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-medium text-amber-200">Wrong Network</div>
-                <div className="mt-1 text-sm text-amber-300/80">
-                  Please switch to BSC Mainnet to transfer tokens
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!address && (
-          <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <Wallet className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-medium text-amber-200">Wallet Not Connected</div>
-                <div className="mt-1 text-sm text-amber-300/80">
-                  Connect your wallet to transfer tokens
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Token Information */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-            <div className="text-xs text-gray-400 mb-2">Token</div>
-            <div className="text-lg font-bold text-white">{symbol}</div>
-            <div className="text-xs text-gray-500 mt-1">ERC-20 Token</div>
-          </div>
-          
-          <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-            <div className="text-xs text-gray-400 mb-2">Decimals</div>
-            <div className="text-lg font-bold text-white">{decimals}</div>
-            <div className="text-xs text-gray-500 mt-1">Token precision</div>
-          </div>
-          
-          <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-            <div className="text-xs text-gray-400 mb-2">Network</div>
-            <div className={`text-lg font-bold ${onBsc ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {onBsc ? 'BSC Mainnet' : 'Wrong Network'}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">Chain ID: {chainId}</div>
-          </div>
-        </div>
-
-        {/* Token Address */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-white">Token Address</h3>
-            {tokenIsValid && (
-              <button
-                onClick={handleCopyTokenAddress}
-                className="text-xs px-3 py-1.5 rounded-lg bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 transition-colors flex items-center gap-2"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    Copy
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-          <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-            <div className="font-mono text-sm break-all text-gray-300">
-              {tokenAddr || "Token address not available"}
-            </div>
-          </div>
-        </div>
-
-        {/* Balance Card */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold text-white mb-3">Your Balance</h3>
-          <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-blue-900/20 to-cyan-900/20">
-            {balanceLoading ? (
-              <div className="h-12 w-48 bg-gray-800/50 rounded-lg animate-pulse" />
-            ) : (
-              <>
-                <div className="text-3xl font-bold text-white mb-2">
-                  {formatDecimalStr(balanceHuman, 1)} <span className="text-cyan-300">{symbol}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-400">
-                    Available for transfer
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (balanceHuman !== "—") setAmountText(balanceHuman);
-                    }}
-                    disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                    className="text-sm px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 disabled:opacity-50 rounded-lg transition-all duration-200"
-                  >
-                    Use Max
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Recipient */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold text-white mb-3">Recipient Address</h3>
-          <div className="relative">
-            <input
-              type="text"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value.trim())}
-              className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
-              placeholder="0x..."
-              spellCheck={false}
-              autoComplete="off"
-              disabled={!address}
-            />
-            {explorerBase && recipientValid && (
-              <a
-                href={`${explorerBase}/address/${recipient}`}
-                target="_blank"
-                rel="noreferrer"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-lg"
-                title="View address on explorer"
-              >
-                <ExternalLink className="w-4 h-4 text-gray-400" />
-              </a>
-            )}
-          </div>
-          {recipient.length > 0 && !recipientValid && (
-            <div className="mt-2 text-xs text-red-400 flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Invalid recipient address
-            </div>
-          )}
-          {recipientValid && !notSelf && (
-            <div className="mt-2 text-xs text-amber-400 flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Cannot send to your own address
-            </div>
-          )}
-        </div>
-
-        {/* Amount */}
-        <div className="mb-6">
-          <h3 className="text-base font-semibold text-white mb-3">Amount to Transfer</h3>
-          <div className="relative mb-4">
-            <input
-              inputMode="decimal"
-              type="text"
-              value={normalizedAmount}
-              onChange={(e) => setAmountText(e.target.value)}
-              className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-xl font-bold text-right text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
-              placeholder="0.0"
-              spellCheck={false}
-              autoComplete="off"
-              disabled={!address}
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-              {symbol}
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (balanceHuman !== "—") {
-                    const half = (parseFloat(balanceHuman) / 2).toString();
-                    setAmountText(half);
-                  }
-                }}
-                disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
-              >
-                50%
-              </button>
-              <button
-                onClick={() => {
-                  if (balanceHuman !== "—") setAmountText(balanceHuman);
-                }}
-                disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
-              >
-                MAX
-              </button>
-            </div>
-            
-            {normalizedAmount && (
-              <button
-                onClick={() => setAmountText("")}
-                className="text-xs text-gray-400 hover:text-white transition-colors"
-                type="button"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          
-          {amountError && (
-            <div className="mt-2 text-xs text-red-400">{amountError}</div>
-          )}
-          {!amountError && normalizedAmount && hasAmount && !hasEnough && (
-            <div className="mt-2 text-xs text-red-400">Amount exceeds your available balance</div>
-          )}
-        </div>
-
-        {/* Transfer Button */}
-        <div className="pt-4 border-t border-white/10">
-          <button
-            onClick={handleTransfer}
-            disabled={!canTransfer}
-            className={`
-              w-full py-4 rounded-xl font-bold text-lg transition-all duration-300
-              flex items-center justify-center gap-3
-              ${!canTransfer
-                ? 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-400 hover:to-cyan-500 text-white hover:shadow-xl hover:-translate-y-0.5'
-              }
-            `}
-            type="button"
-          >
-            {isPending ? (
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                Confirming in wallet...
-              </div>
-            ) : receipt.isLoading ? (
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                Waiting for confirmation...
-              </div>
-            ) : !address ? (
-              <div className="flex items-center justify-center gap-3">
-                <Wallet className="w-5 h-5" />
-                Connect Wallet to Transfer
-              </div>
-            ) : (
-              <>
-                <Send className="w-5 h-5" />
-                Transfer {normalizedAmount ? `${normalizedAmount} ${symbol}` : symbol}
-              </>
-            )}
-          </button>
-          
-          {/* Transaction Status */}
-          {(txHash || receipt.isSuccess) && (
-            <div className="mt-4 space-y-3">
-              {txHash && (
-                <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <div>
-                        <div className="text-sm font-medium text-emerald-200">Transaction Submitted</div>
-                        {txUrl && (
-                          <a
-                            href={txUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-emerald-300/80 hover:text-emerald-200 inline-flex items-center gap-1"
-                          >
-                            View on Explorer
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        )}
+            {/* Transaction Status */}
+            {(txHash || receipt.isSuccess) && (
+              <div className="mt-4 space-y-3">
+                {txHash && (
+                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-emerald-200">
+                            Transaction Submitted
+                          </div>
+                          {txUrl && (
+                            <a
+                              href={txUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-emerald-300/80 hover:text-emerald-200 inline-flex items-center gap-1 break-all"
+                            >
+                              View on Explorer
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-              
-              {receipt.isSuccess && (
-                <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
-                  <div className="flex items-center gap-3">
-                    <Check className="w-5 h-5 text-emerald-400" />
-                    <div>
-                      <div className="font-medium text-emerald-200">Transfer Successful!</div>
-                      <div className="text-sm text-emerald-300/80">
-                        Sent {normalizedAmount} {symbol} to {shortAddr(recipient)}
+                )}
+
+                {receipt.isSuccess && (
+                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
+                    <div className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-emerald-200">Transfer Successful!</div>
+                        <div className="text-sm text-emerald-300/80 break-words">
+                          Sent {normalizedAmount} {symbol} to {shortAddr(recipient)}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Important Notice */}
-          <div className="mt-6 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-medium text-amber-200 mb-1">Important Notice</div>
-                <div className="text-sm text-amber-300/80">
-                  Token transfers are irreversible. Always verify the recipient address before confirming.
-                  Some tokens may have transfer restrictions or fees.
+                )}
+              </div>
+            )}
+
+            {/* Important Notice */}
+            <div className="mt-6 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5">
+              <div className="flex items-start gap-3">
+                <Shield className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-amber-200 mb-1">Important Notice</div>
+                  <div className="text-sm text-amber-300/80 break-words">
+                    Token transfers are irreversible. Always verify the recipient address before confirming.
+                    Some tokens may have transfer restrictions or fees.
+                  </div>
                 </div>
               </div>
             </div>
