@@ -366,7 +366,7 @@ const Hero = () => {
                             bg-gray-900/50 border border-gray-800 backdrop-blur-sm"
             >
               <span className="text-xs sm:text-sm text-gray-400 font-mono">
-                {tokenDetails.address.slice(0, 6)}...{tokenDetails.address.slice(-4)}
+                {tokenDetails.address.slice(0, 5)}...{tokenDetails.address.slice(-3)}
               </span>
               <button
                 onClick={copyToClipboard}
