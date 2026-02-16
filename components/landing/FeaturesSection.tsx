@@ -43,6 +43,13 @@ const FeaturesSection = () => {
         "Flexible and long-term staking options with boosted APR for committed holders.",
       gradient: "from-[#6F8BFF] to-[#FF6FD8]",
     },
+     {
+      icon: "🔥",
+      title: "Hard capped and burnable Token",
+      description:
+        "Flexible and long-term valuable APR for committed holders.",
+      gradient: "from-[#6F8BFF] to-[#FF6FD8]",
+    },
   ];
 
   return (

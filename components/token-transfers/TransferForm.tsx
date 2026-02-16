@@ -340,395 +340,478 @@ export default function TransferForm() {
   }
 
   return (
-    // ✅ Center + responsive padding + max width
-    <div className="w-full px-3 sm:px-4 md:px-0">
-      <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/50 to-black/30 backdrop-blur-xl shadow-2xl">
-        {/* Animated background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+  <div className="min-h-screen w-full bg-gradient-to-br from-[#12082a] via-[#070a18] to-black">
+    {/* Page container */}
+    <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      {/* Page header (matches your screenshot style) */}
+      <header className="mb-6 lg:mb-10">
+        <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+          Transfer
+        </h1>
+        <p className="mt-1 text-sm sm:text-base text-white/60">
+          Send an ERC-20 token to another wallet address.
+        </p>
+      </header>
 
-        <div className="relative p-4 sm:p-6 lg:p-8">
-          {/* Header */}
-          <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="shrink-0 p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/30">
-                <Send className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-2xl font-bold text-white truncate">
-                  Transfer Tokens
-                </h2>
-                <p className="text-xs sm:text-sm text-gray-400 truncate">
-                  Send {symbol} to another wallet
-                </p>
-              </div>
-            </div>
+      {/* Layout: form left, empty/extra content right (lg+) */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,540px)_1fr] lg:items-start">
+        {/* LEFT: Transfer card */}
+        <section className="w-full">
+          <div
+            className="
+              relative overflow-hidden rounded-2xl
+              border border-white/10 bg-white/[0.04] backdrop-blur-xl
+              shadow-[0_30px_80px_-40px_rgba(0,0,0,0.9)]
+            "
+          >
+            {/* Subtle animated-ish background layers */}
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-blue-500/10" />
+            <div className="pointer-events-none absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-            {hasInitialData && !dashLoading && (
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="self-start sm:self-auto p-2 rounded-lg hover:bg-white/10 transition-all duration-200 disabled:opacity-50 group"
-                aria-label="Refresh data"
-              >
-                <RefreshCw
-                  className={`w-4 h-4 text-gray-400 group-hover:text-blue-400 ${
-                    isRefreshing ? "animate-spin" : ""
-                  }`}
-                />
-              </button>
-            )}
-          </div>
-
-          {/* Error Messages */}
-          {(uiError || dashError || writeError) && (
-            <div className="mb-6 rounded-xl border border-red-500/30 bg-gradient-to-r from-red-500/10 to-red-600/5 p-4 backdrop-blur-sm">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-red-200">Transfer Failed</div>
-                  <div className="mt-1 text-sm text-red-300/80 break-words">
-                    {uiError ||
-                      humanizeTxError(writeError) ||
-                      "Unable to load token data. Please try again."}
+            <div className="relative p-4 sm:p-6 lg:p-8">
+              {/* Header */}
+              <div className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-xl border border-white/10 bg-white/5 p-2.5">
+                    <Send className="h-5 w-5 sm:h-6 sm:w-6 text-blue-300" />
                   </div>
-                  {uiErrorDetails && (
-                    <details className="mt-2">
-                      <summary className="text-xs text-red-300/60 cursor-pointer select-none">
-                        Show details
-                      </summary>
-                      <div className="mt-2 text-xs text-red-300/50 whitespace-pre-wrap break-words">
-                        {uiErrorDetails}
+
+                  <div className="min-w-0">
+                    <h2 className="text-lg sm:text-2xl font-semibold text-white truncate">
+                      Transfer Tokens
+                    </h2>
+                    <p className="text-xs sm:text-sm text-white/55 truncate">
+                      Send {symbol} to another wallet
+                    </p>
+                  </div>
+                </div>
+
+                {hasInitialData && !dashLoading && (
+                  <button
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    className="shrink-0 rounded-lg border border-white/10 bg-white/5 p-2 hover:bg-white/10 transition disabled:opacity-50"
+                    aria-label="Refresh data"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 text-white/60 ${isRefreshing ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {/* Error Messages */}
+              {(uiError || dashError || writeError) && (
+                <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-red-100">Transfer Failed</div>
+                      <div className="mt-1 text-sm text-red-100/80 break-words">
+                        {uiError ||
+                          humanizeTxError(writeError) ||
+                          "Unable to load token data. Please try again."}
                       </div>
-                    </details>
+                      {uiErrorDetails && (
+                        <details className="mt-2">
+                          <summary className="text-xs text-red-100/60 cursor-pointer select-none">
+                            Show details
+                          </summary>
+                          <div className="mt-2 text-xs text-red-100/50 whitespace-pre-wrap break-words">
+                            {uiErrorDetails}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Network Warning */}
+              {!onBsc && isConnected && (
+                <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-amber-100">Wrong Network</div>
+                      <div className="mt-1 text-sm text-amber-100/80 break-words">
+                        Please switch to BSC Mainnet to transfer tokens.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!address && (
+                <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <Wallet className="h-5 w-5 text-amber-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-amber-100">Wallet Not Connected</div>
+                      <div className="mt-1 text-sm text-amber-100/80 break-words">
+                        Connect your wallet to transfer tokens.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Token Information */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs text-white/55 mb-2">Token</div>
+                  <div className="text-lg font-semibold text-white break-words">{symbol}</div>
+                  <div className="text-xs text-white/40 mt-1">ERC-20 Token</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs text-white/55 mb-2">Decimals</div>
+                  <div className="text-lg font-semibold text-white">{decimals}</div>
+                  <div className="text-xs text-white/40 mt-1">Token precision</div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-xs text-white/55 mb-2">Network</div>
+                  <div className={`text-lg font-semibold ${onBsc ? "text-emerald-300" : "text-amber-300"}`}>
+                    {onBsc ? "BSC Mainnet" : "Wrong Network"}
+                  </div>
+                  <div className="text-xs text-white/40 mt-1">Chain ID: {chainId}</div>
+                </div>
+              </div>
+
+              {/* Token Address */}
+              <div className="mb-6">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-base font-semibold text-white">Token Address</h3>
+
+                  {tokenIsValid && (
+                    <button
+                      onClick={handleCopyTokenAddress}
+                      className="
+                        w-full sm:w-auto
+                        rounded-xl border border-white/10 bg-white/5
+                        px-3 py-2 text-xs text-white/70
+                        hover:bg-white/10 transition
+                        flex items-center justify-center gap-2
+                      "
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-300" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Network Warning */}
-          {!onBsc && isConnected && (
-            <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-amber-200">Wrong Network</div>
-                  <div className="mt-1 text-sm text-amber-300/80 break-words">
-                    Please switch to BSC Mainnet to transfer tokens
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="font-mono text-xs sm:text-sm break-all text-white/70">
+                    {tokenAddr || "Token address not available"}
                   </div>
                 </div>
               </div>
-            </div>
-          )}
 
-          {!address && (
-            <div className="mb-6 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5 p-4 backdrop-blur-sm">
-              <div className="flex items-start gap-3">
-                <Wallet className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-amber-200">Wallet Not Connected</div>
-                  <div className="mt-1 text-sm text-amber-300/80 break-words">
-                    Connect your wallet to transfer tokens
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Token Information */}
-          {/* ✅ 1 col on mobile, 2 on sm, 3 on lg */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-              <div className="text-xs text-gray-400 mb-2">Token</div>
-              <div className="text-lg font-bold text-white break-words">{symbol}</div>
-              <div className="text-xs text-gray-500 mt-1">ERC-20 Token</div>
-            </div>
-
-            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-              <div className="text-xs text-gray-400 mb-2">Decimals</div>
-              <div className="text-lg font-bold text-white">{decimals}</div>
-              <div className="text-xs text-gray-500 mt-1">Token precision</div>
-            </div>
-
-            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-              <div className="text-xs text-gray-400 mb-2">Network</div>
-              <div className={`text-lg font-bold ${onBsc ? "text-emerald-400" : "text-amber-400"}`}>
-                {onBsc ? "BSC Mainnet" : "Wrong Network"}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Chain ID: {chainId}</div>
-            </div>
-          </div>
-
-          {/* Token Address */}
-          <div className="mb-6">
-            {/* ✅ stack on mobile */}
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-base font-semibold text-white">Token Address</h3>
-
-              {tokenIsValid && (
-                <button
-                  onClick={handleCopyTokenAddress}
-                  className="w-full sm:w-auto text-xs px-3 py-2 rounded-lg bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 transition-colors flex items-center justify-center gap-2"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      Copied
-                    </>
+              {/* Balance */}
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-white mb-3">Your Balance</h3>
+                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 p-4">
+                  {balanceLoading ? (
+                    <div className="h-10 sm:h-12 w-44 sm:w-48 bg-white/10 rounded-xl animate-pulse" />
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5" />
-                      Copy
+                      <div className="text-2xl sm:text-3xl font-bold text-white mb-2 break-words">
+                        {formatDecimalStr(balanceHuman, 6)}{" "}
+                        <span className="text-cyan-200">{symbol}</span>
+                      </div>
+
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-xs text-white/55">Available for transfer</div>
+                        <button
+                          onClick={() => {
+                            if (balanceHuman !== "—") setAmountText(balanceHuman);
+                          }}
+                          disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
+                          className="
+                            w-full sm:w-auto rounded-xl
+                            border border-white/10 bg-white/5
+                            px-4 py-2 text-sm text-white/75
+                            hover:bg-white/10 transition
+                            disabled:opacity-50
+                          "
+                        >
+                          Use Max
+                        </button>
+                      </div>
                     </>
                   )}
-                </button>
-              )}
-            </div>
-
-            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-gray-900/30 to-black/20">
-              <div className="font-mono text-xs sm:text-sm break-all text-gray-300">
-                {tokenAddr || "Token address not available"}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Balance Card */}
-          <div className="mb-6">
-            <h3 className="text-base font-semibold text-white mb-3">Your Balance</h3>
-            <div className="p-4 rounded-xl border border-white/10 bg-gradient-to-br from-blue-900/20 to-cyan-900/20">
-              {balanceLoading ? (
-                <div className="h-10 sm:h-12 w-44 sm:w-48 bg-gray-800/50 rounded-lg animate-pulse" />
-              ) : (
-                <>
-                  {/* ✅ responsive text size + break words */}
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-2 break-words">
-                    {formatDecimalStr(balanceHuman, 6)}{" "}
-                    <span className="text-cyan-300">{symbol}</span>
+              {/* Recipient */}
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-white mb-3">Recipient Address</h3>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}  // ✅ don’t trim while typing
+                    onBlur={(e) => setRecipient(e.target.value.trim())} // ✅ normalize on blur
+                    className="
+                      w-full rounded-2xl border border-white/10 bg-black/30
+                      px-4 py-3 font-mono text-xs sm:text-sm text-white
+                      placeholder:text-white/35
+                      focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent
+                      disabled:opacity-60
+                    "
+                    placeholder="0x..."
+                    spellCheck={false}
+                    autoComplete="off"
+                    disabled={!address}
+                  />
+
+                  {explorerBase && recipientValid && (
+                    <a
+                      href={`${explorerBase}/address/${recipient}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 rounded-xl p-2 hover:bg-white/10 transition"
+                      title="View address on explorer"
+                    >
+                      <ExternalLink className="h-4 w-4 text-white/60" />
+                    </a>
+                  )}
+                </div>
+
+                {recipient.length > 0 && !recipientValid && (
+                  <div className="mt-2 text-xs text-red-300 flex items-center gap-2">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Invalid recipient address
                   </div>
+                )}
+                {recipientValid && !notSelf && (
+                  <div className="mt-2 text-xs text-amber-300 flex items-center gap-2">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Cannot send to your own address
+                  </div>
+                )}
+              </div>
 
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="text-xs text-gray-400">Available for transfer</div>
+              {/* Amount */}
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-white mb-3">Amount to Transfer</h3>
+
+                <div className="relative mb-4">
+                  <input
+                    inputMode="decimal"
+                    type="text"
+                    value={normalizedAmount}
+                    onChange={(e) => setAmountText(e.target.value)}
+                    className="
+                      w-full rounded-2xl border border-white/10 bg-black/30
+                      px-4 py-3 text-right text-lg sm:text-xl font-semibold text-white
+                      placeholder:text-white/35
+                      focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-transparent
+                      disabled:opacity-60
+                    "
+                    placeholder="0.0"
+                    spellCheck={false}
+                    autoComplete="off"
+                    disabled={!address}
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/55 text-sm sm:text-base">
+                    {symbol}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => {
+                        if (balanceHuman !== "—") {
+                          const half = (parseFloat(balanceHuman) / 2).toString();
+                          setAmountText(half);
+                        }
+                      }}
+                      disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
+                      className="
+                        flex-1 sm:flex-none rounded-xl
+                        border border-white/10 bg-white/5
+                        px-3 py-2 text-xs text-white/75
+                        hover:bg-white/10 transition
+                        disabled:opacity-50
+                      "
+                    >
+                      50%
+                    </button>
+
                     <button
                       onClick={() => {
                         if (balanceHuman !== "—") setAmountText(balanceHuman);
                       }}
                       disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                      className="w-full sm:w-auto text-sm px-4 py-2 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 disabled:opacity-50 rounded-lg transition-all duration-200"
+                      className="
+                        flex-1 sm:flex-none rounded-xl
+                        border border-white/10 bg-white/5
+                        px-3 py-2 text-xs text-white/75
+                        hover:bg-white/10 transition
+                        disabled:opacity-50
+                      "
                     >
-                      Use Max
+                      MAX
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
 
-          {/* Recipient */}
-          <div className="mb-6">
-            <h3 className="text-base font-semibold text-white mb-3">Recipient Address</h3>
-            <div className="relative">
-              <input
-                type="text"
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value.trim())}
-                className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl font-mono text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
-                placeholder="0x..."
-                spellCheck={false}
-                autoComplete="off"
-                disabled={!address}
-              />
-              {explorerBase && recipientValid && (
-                <a
-                  href={`${explorerBase}/address/${recipient}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-lg"
-                  title="View address on explorer"
-                >
-                  <ExternalLink className="w-4 h-4 text-gray-400" />
-                </a>
-              )}
-            </div>
+                  {normalizedAmount && (
+                    <button
+                      onClick={() => setAmountText("")}
+                      className="text-xs text-white/55 hover:text-white transition self-end sm:self-auto"
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
 
-            {recipient.length > 0 && !recipientValid && (
-              <div className="mt-2 text-xs text-red-400 flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Invalid recipient address
+                {amountError && <div className="mt-2 text-xs text-red-300">{amountError}</div>}
+                {!amountError && normalizedAmount && hasAmount && !hasEnough && (
+                  <div className="mt-2 text-xs text-red-300">
+                    Amount exceeds your available balance
+                  </div>
+                )}
               </div>
-            )}
-            {recipientValid && !notSelf && (
-              <div className="mt-2 text-xs text-amber-400 flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Cannot send to your own address
-              </div>
-            )}
-          </div>
 
-          {/* Amount */}
-          <div className="mb-6">
-            <h3 className="text-base font-semibold text-white mb-3">Amount to Transfer</h3>
-            <div className="relative mb-4">
-              <input
-                inputMode="decimal"
-                type="text"
-                value={normalizedAmount}
-                onChange={(e) => setAmountText(e.target.value)}
-                className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl text-lg sm:text-xl font-bold text-right text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
-                placeholder="0.0"
-                spellCheck={false}
-                autoComplete="off"
-                disabled={!address}
-              />
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm sm:text-base">
-                {symbol}
-              </div>
-            </div>
-
-            {/* ✅ wrap controls on small screens */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-2">
+              {/* Transfer Button */}
+              <div className="pt-4 border-t border-white/10">
                 <button
-                  onClick={() => {
-                    if (balanceHuman !== "—") {
-                      const half = (parseFloat(balanceHuman) / 2).toString();
-                      setAmountText(half);
+                  onClick={handleTransfer}
+                  disabled={!canTransfer}
+                  className={`
+                    w-full rounded-2xl font-semibold transition
+                    flex items-center justify-center gap-3
+                    py-3 sm:py-4 text-base sm:text-lg
+                    ${
+                      !canTransfer
+                        ? "bg-white/10 text-white/45 cursor-not-allowed border border-white/10"
+                        : "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white shadow-[0_18px_50px_-25px_rgba(34,211,238,0.6)] hover:-translate-y-0.5"
                     }
-                  }}
-                  disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                  className="flex-1 sm:flex-none px-3 py-2 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  50%
-                </button>
-                <button
-                  onClick={() => {
-                    if (balanceHuman !== "—") setAmountText(balanceHuman);
-                  }}
-                  disabled={balanceHuman === "—" || !tokenIsValid || !onBsc}
-                  className="flex-1 sm:flex-none px-3 py-2 text-xs bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-700 hover:to-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
-                >
-                  MAX
-                </button>
-              </div>
-
-              {normalizedAmount && (
-                <button
-                  onClick={() => setAmountText("")}
-                  className="text-xs text-gray-400 hover:text-white transition-colors self-end sm:self-auto"
+                  `}
                   type="button"
                 >
-                  Clear
+                  {isPending ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      Confirming in wallet...
+                    </div>
+                  ) : receipt.isLoading ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      Waiting for confirmation...
+                    </div>
+                  ) : !address ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <Wallet className="h-5 w-5" />
+                      Connect Wallet to Transfer
+                    </div>
+                  ) : (
+                    <>
+                      <Send className="h-5 w-5" />
+                      Transfer {normalizedAmount ? `${normalizedAmount} ${symbol}` : symbol}
+                    </>
+                  )}
                 </button>
-              )}
-            </div>
 
-            {amountError && <div className="mt-2 text-xs text-red-400">{amountError}</div>}
-            {!amountError && normalizedAmount && hasAmount && !hasEnough && (
-              <div className="mt-2 text-xs text-red-400">Amount exceeds your available balance</div>
-            )}
-          </div>
-
-          {/* Transfer Button */}
-          <div className="pt-4 border-t border-white/10">
-            <button
-              onClick={handleTransfer}
-              disabled={!canTransfer}
-              className={`
-                w-full rounded-xl font-bold transition-all duration-300
-                flex items-center justify-center gap-3
-                py-3 sm:py-4 text-base sm:text-lg
-                ${
-                  !canTransfer
-                    ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-400 hover:to-cyan-500 text-white hover:shadow-xl hover:-translate-y-0.5"
-                }
-              `}
-              type="button"
-            >
-              {isPending ? (
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  Confirming in wallet...
-                </div>
-              ) : receipt.isLoading ? (
-                <div className="flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  Waiting for confirmation...
-                </div>
-              ) : !address ? (
-                <div className="flex items-center justify-center gap-3">
-                  <Wallet className="w-5 h-5" />
-                  Connect Wallet to Transfer
-                </div>
-              ) : (
-                <>
-                  <Send className="w-5 h-5" />
-                  Transfer {normalizedAmount ? `${normalizedAmount} ${symbol}` : symbol}
-                </>
-              )}
-            </button>
-
-            {/* Transaction Status */}
-            {(txHash || receipt.isSuccess) && (
-              <div className="mt-4 space-y-3">
-                {txHash && (
-                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-emerald-200">
-                            Transaction Submitted
+                {/* Transaction Status */}
+                {(txHash || receipt.isSuccess) && (
+                  <div className="mt-4 space-y-3">
+                    {txHash && (
+                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-emerald-100">
+                              Transaction Submitted
+                            </div>
+                            {txUrl && (
+                              <a
+                                href={txUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-emerald-100/75 hover:text-emerald-100 inline-flex items-center gap-1 break-all"
+                              >
+                                View on Explorer
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
                           </div>
-                          {txUrl && (
-                            <a
-                              href={txUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-emerald-300/80 hover:text-emerald-200 inline-flex items-center gap-1 break-all"
-                            >
-                              View on Explorer
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
                         </div>
                       </div>
-                    </div>
+                    )}
+
+                    {receipt.isSuccess && (
+                      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                        <div className="flex items-start gap-3">
+                          <Check className="h-5 w-5 text-emerald-300 mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-medium text-emerald-100">Transfer Successful!</div>
+                            <div className="text-sm text-emerald-100/75 break-words">
+                              Sent {normalizedAmount} {symbol} to {shortAddr(recipient)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {receipt.isSuccess && (
-                  <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-green-600/5">
-                    <div className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <div className="font-medium text-emerald-200">Transfer Successful!</div>
-                        <div className="text-sm text-emerald-300/80 break-words">
-                          Sent {normalizedAmount} {symbol} to {shortAddr(recipient)}
-                        </div>
+                {/* Important Notice */}
+                <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-5 w-5 text-amber-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-amber-100 mb-1">Important Notice</div>
+                      <div className="text-sm text-amber-100/75 break-words">
+                        Token transfers are irreversible. Always verify the recipient address before confirming.
+                        Some tokens may have transfer restrictions or fees.
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Important Notice */}
-            <div className="mt-6 p-4 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-600/5">
-              <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-amber-200 mb-1">Important Notice</div>
-                  <div className="text-sm text-amber-300/80 break-words">
-                    Token transfers are irreversible. Always verify the recipient address before confirming.
-                    Some tokens may have transfer restrictions or fees.
                   </div>
                 </div>
               </div>
+              {/* /Transfer Button */}
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* RIGHT: Optional panel (only on lg+) to avoid “empty space” and look pro */}
+        <aside className="hidden lg:block">
+          <div className="sticky top-24 space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6">
+              <h3 className="text-base font-semibold text-white">Checklist</h3>
+              <ul className="mt-3 space-y-2 text-sm text-white/65">
+                <li>• Confirm you’re on BSC Mainnet</li>
+                <li>• Double-check the recipient address</li>
+                <li>• Keep some BNB for gas fees</li>
+                <li>• Transfers can’t be reversed</li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-6">
+              <h3 className="text-base font-semibold text-white">Need help?</h3>
+              <p className="mt-2 text-sm text-white/65">
+                If you paste an address, use the explorer icon to verify it before sending.
+              </p>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
-  );
+  </div>
+);
 }
