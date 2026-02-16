@@ -1,14 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { useRef, useState, useCallback } from "react";
+import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
   Rocket,
-  Shield,
   ExternalLink,
   Sparkles,
   Globe,
-  Cpu,
   TrendingUp,
   Wallet,
   CheckCircle,
@@ -17,17 +15,65 @@ import {
   Copy,
 } from "lucide-react";
 
+type MetaMaskStatus = "idle" | "loading" | "success" | "error";
+
+const BSC_CHAIN_ID = "0x38"; // 56
+
+const BSC_PARAMS = {
+  chainId: BSC_CHAIN_ID,
+  chainName: "BNB Smart Chain",
+  nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+  rpcUrls: ["https://bnb-mainnet.g.alchemy.com/v2/6UaUjDBWPAHXTN_IPZ7GR"],
+  blockExplorerUrls: ["https://bscscan.com/"],
+};
+
+const getEthereum = () => (window as any)?.ethereum as any | undefined;
+
+const ensureBSCNetwork = async (ethereum: any) => {
+  const currentChainId = await ethereum.request({ method: "eth_chainId" });
+  if (currentChainId === BSC_CHAIN_ID) return;
+
+  try {
+    await ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BSC_CHAIN_ID }],
+    });
+  } catch (switchErr: any) {
+    // 4902 = chain not added to MetaMask yet
+    if (switchErr?.code === 4902) {
+      await ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [BSC_PARAMS],
+      });
+    } else {
+      throw switchErr;
+    }
+  }
+};
+
+const watchAsset = async (ethereum: any, token: any) => {
+  return await ethereum.request({
+    method: "wallet_watchAsset",
+    params: {
+      type: "ERC20",
+      options: {
+        address: token.address,
+        symbol: token.symbol,
+        decimals: token.decimals,
+        image: token.image || undefined, // recommended: real https logo url
+      },
+    },
+  });
+};
+
 const Hero = () => {
   const ref = useRef<HTMLDivElement | null>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  
-  // State for MetaMask integration
-  const [metaMaskStatus, setMetaMaskStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
+
+  const [metaMaskStatus, setMetaMaskStatus] = useState<MetaMaskStatus>("idle");
   const [copied, setCopied] = useState(false);
 
-  // Stats data (only two as per your image)
+  // Stats data
   const stats = [
     { label: "Total Supply", value: "21M", sub: "$AERA Tokens", icon: TrendingUp },
     { label: "Network", value: "BSC", sub: "Binance Smart Chain", icon: Globe },
@@ -35,10 +81,10 @@ const Hero = () => {
 
   // Token details
   const tokenDetails = {
-    address: "0x799aE8cc69Ae5Bb69888B39518F4B4ED18afd4b3",
+    address: "0x2191f59b994E7Ad5BFf3C2F3abDe36167570822F",
     symbol: "AERA",
     decimals: 18,
-    image: "", // Add your token logo URL here
+    image: "", // put your token logo URL (https://...) for best UX
   };
 
   const copyToClipboard = () => {
@@ -47,46 +93,71 @@ const Hero = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const addTokenToMetaMask = async () => {
+  const addTokenToMetaMask = useCallback(async () => {
     setMetaMaskStatus("loading");
-    
-    try {
-      const ethereum = (window as any).ethereum;
 
-      if (!ethereum) {
+    try {
+      const ethereum = getEthereum();
+
+      if (!ethereum?.isMetaMask) {
         setMetaMaskStatus("error");
         window.open("https://metamask.io/download/", "_blank");
-        setTimeout(() => setMetaMaskStatus("idle"), 3000);
+        setTimeout(() => setMetaMaskStatus("idle"), 1600);
         return;
       }
 
+      // 1) Ensure BSC so token appears right away
+      await ensureBSCNetwork(ethereum);
+
+      // 2) Try adding token without forcing connect (faster)
+      try {
+        const wasAdded = await watchAsset(ethereum, tokenDetails);
+
+        if (wasAdded) {
+          setMetaMaskStatus("success");
+          setTimeout(() => setMetaMaskStatus("idle"), 1600);
+        } else {
+          setMetaMaskStatus("idle");
+        }
+        return;
+      } catch (err: any) {
+        // If permissions needed, request accounts then retry once
+        const needsPermissions =
+          err?.code === 4100 || err?.message?.toLowerCase?.().includes("unauthorized");
+
+        if (!needsPermissions) throw err;
+      }
+
+      // 3) Permission path (only when required)
       await ethereum.request({ method: "eth_requestAccounts" });
 
-      const wasAdded = await ethereum.request({
-        method: "wallet_watchAsset",
-        params: {
-          type: "ERC20",
-          options: {
-            address: tokenDetails.address,
-            symbol: tokenDetails.symbol,
-            decimals: tokenDetails.decimals,
-            image: tokenDetails.image,
-          },
-        },
-      });
+      const wasAdded = await watchAsset(ethereum, tokenDetails);
 
       if (wasAdded) {
         setMetaMaskStatus("success");
-        setTimeout(() => setMetaMaskStatus("idle"), 3000);
+        setTimeout(() => setMetaMaskStatus("idle"), 1600);
       } else {
         setMetaMaskStatus("idle");
       }
-    } catch (error) {
+    } catch (error: any) {
+      // user rejected popup
+      if (error?.code === 4001) {
+        setMetaMaskStatus("idle");
+        return;
+      }
+
+      // already pending request in MetaMask
+      if (error?.code === -32002) {
+        setMetaMaskStatus("loading");
+        setTimeout(() => setMetaMaskStatus("idle"), 1600);
+        return;
+      }
+
       console.error("Error adding token to MetaMask:", error);
       setMetaMaskStatus("error");
-      setTimeout(() => setMetaMaskStatus("idle"), 3000);
+      setTimeout(() => setMetaMaskStatus("idle"), 1600);
     }
-  };
+  }, [tokenDetails.address, tokenDetails.symbol, tokenDetails.decimals, tokenDetails.image]);
 
   const getButtonContent = () => {
     switch (metaMaskStatus) {
@@ -133,7 +204,7 @@ const Hero = () => {
     const baseClasses = `px-8 py-4 rounded-2xl backdrop-blur-xl
       transition-all duration-300 flex items-center justify-center gap-3
       flex-1 sm:flex-none min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed`;
-    
+
     switch (metaMaskStatus) {
       case "loading":
         return `${baseClasses} border border-purple-500/50 bg-purple-900/30 cursor-wait`;
@@ -148,16 +219,6 @@ const Hero = () => {
     }
   };
 
-  // Floating animation for background orbs
-  const floatingAnimation = {
-    y: [0, -20, 0],
-    transition: {
-      duration: 6,
-      repeat: Infinity,
-      ease: "easeInOut",
-    },
-  };
-
   return (
     <section
       id="home"
@@ -170,8 +231,8 @@ const Hero = () => {
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, 90, 0],
-            x: ['-10%', '10%', '-10%'],
-            y: ['-10%', '10%', '-10%'],
+            x: ["-10%", "10%", "-10%"],
+            y: ["-10%", "10%", "-10%"],
           }}
           transition={{
             duration: 20,
@@ -185,8 +246,8 @@ const Hero = () => {
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, -90, 0],
-            x: ['10%', '-10%', '10%'],
-            y: ['10%', '-10%', '10%'],
+            x: ["10%", "-10%", "10%"],
+            y: ["10%", "-10%", "10%"],
           }}
           transition={{
             duration: 25,
@@ -218,9 +279,11 @@ const Hero = () => {
                        shadow-lg shadow-cyan-500/10"
           >
             <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span className="text-xs sm:text-sm font-medium bg-gradient-to-r
+            <span
+              className="text-xs sm:text-sm font-medium bg-gradient-to-r
                              from-cyan-300 via-purple-300 to-pink-300
-                             bg-clip-text text-transparent">
+                             bg-clip-text text-transparent"
+            >
               THE NEXT BITCOIN
             </span>
           </motion.div>
@@ -255,12 +318,14 @@ const Hero = () => {
             transition={{ delay: 0.6, duration: 0.5 }}
             className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 mb-6"
           >
-            <button className="group relative overflow-hidden px-8 py-4 rounded-2xl
+            <button
+              className="group relative overflow-hidden px-8 py-4 rounded-2xl
                                bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600
                                hover:from-cyan-500 hover:via-purple-500 hover:to-pink-500
                                transition-all duration-500 shadow-lg hover:scale-[1.02]
                                active:scale-[0.98] flex-1 sm:flex-none min-w-[200px]
-                               border border-white/10">
+                               border border-white/10"
+            >
               <span className="relative flex items-center justify-center gap-3 text-base sm:text-lg font-bold text-white">
                 <Rocket className="w-5 h-5" />
                 Join Presale Now
@@ -274,7 +339,18 @@ const Hero = () => {
               disabled={metaMaskStatus === "loading"}
               className={getButtonClasses()}
             >
-              {getButtonContent()}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={metaMaskStatus}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center justify-center gap-3"
+                >
+                  {getButtonContent()}
+                </motion.div>
+              </AnimatePresence>
             </button>
           </motion.div>
 
@@ -285,16 +361,21 @@ const Hero = () => {
             transition={{ delay: 0.7, duration: 0.5 }}
             className="flex items-center justify-center gap-2 mb-8"
           >
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl
-                            bg-gray-900/50 border border-gray-800 backdrop-blur-sm">
+            <div
+              className="flex items-center gap-2 px-4 py-2 rounded-xl
+                            bg-gray-900/50 border border-gray-800 backdrop-blur-sm"
+            >
               <span className="text-xs sm:text-sm text-gray-400 font-mono">
                 {tokenDetails.address.slice(0, 6)}...{tokenDetails.address.slice(-4)}
               </span>
               <button
                 onClick={copyToClipboard}
                 className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+                aria-label="Copy token address"
               >
-                <Copy className={`w-4 h-4 ${copied ? 'text-green-400' : 'text-gray-400'}`} />
+                <Copy
+                  className={`w-4 h-4 ${copied ? "text-green-400" : "text-gray-400"}`}
+                />
               </button>
             </div>
             <span className="text-xs text-gray-500">Token Address</span>
@@ -307,7 +388,7 @@ const Hero = () => {
             transition={{ delay: 0.8, duration: 0.5 }}
             className="grid grid-cols-2 gap-4 max-w-2xl mx-auto"
           >
-            {stats.map(({ label, value, sub, icon: Icon }, index) => (
+            {stats.map(({ label, value, sub, icon: Icon }) => (
               <motion.div
                 key={label}
                 whileHover={{ scale: 1.05, y: -5 }}
@@ -318,9 +399,11 @@ const Hero = () => {
                            transition-all duration-300 group"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-900/30 to-purple-900/30 
+                  <div
+                    className="p-2 rounded-xl bg-gradient-to-br from-cyan-900/30 to-purple-900/30 
                                   border border-cyan-500/20 group-hover:border-cyan-400/50
-                                  transition-colors duration-300">
+                                  transition-colors duration-300"
+                  >
                     <Icon className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300" />
                   </div>
                   <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
