@@ -19,7 +19,7 @@ const TokenomicsSection = () => {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   const tokenData = {
-    totalSupply: "1,000,000,000",
+    totalSupply: "21,000,000",
     allocations: [
       { label: "Public Presale + LP", value: 40, color: "#FF6FD8" },
       { label: "Staking Rewards", value: 20, color: "#6F8BFF" },
