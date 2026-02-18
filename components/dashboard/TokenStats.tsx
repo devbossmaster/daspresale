@@ -338,11 +338,6 @@ export default function TokenStats() {
           <div className="flex justify-between items-center mb-3">
             <span className="text-sm text-gray-400">Sale Progress</span>
             <span className="text-base font-semibold text-white">
-              {isInitialLoading ? (
-                <div className="h-5 w-12 bg-gray-800/50 rounded animate-pulse" />
-              ) : (
-                progress === null ? "N/A" : `${progressSafe.toFixed(1)}%`
-              )}
             </span>
           </div>
 
@@ -361,7 +356,11 @@ export default function TokenStats() {
           </div>
 
           <div className="flex justify-between mt-2 text-xs text-gray-500">
-            <span>0%</span>
+            <span>{isInitialLoading ? (
+                <div className="h-5 w-12 bg-gray-800/50 rounded animate-pulse" />
+              ) : (
+                progress === null ? "N/A" : `${progressSafe.toFixed(1)}%`
+              )}</span>
             <span>100%</span>
           </div>
         </div>

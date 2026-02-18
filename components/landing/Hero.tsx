@@ -204,7 +204,7 @@ const Hero = () => {
   const getButtonClasses = () => {
     const baseClasses = `px-8 py-4 rounded-2xl backdrop-blur-xl
       transition-all duration-300 flex items-center justify-center gap-3
-      flex-1 sm:flex-none min-w-[200px] disabled:opacity-50 disabled:cursor-not-allowed`;
+      w-full disabled:opacity-50 disabled:cursor-not-allowed`;
 
     switch (metaMaskStatus) {
       case "loading":
@@ -221,11 +221,7 @@ const Hero = () => {
   };
 
   return (
-    <section
-      id="home"
-      ref={ref}
-      className="relative overflow-hidden bg-black pt-24 pb-16"
-    >
+    <section id="home" ref={ref} className="relative overflow-hidden bg-black pt-24 pb-16">
       {/* Animated gradient orbs background */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
@@ -312,48 +308,74 @@ const Hero = () => {
             seamless <span className="font-bold text-blue-300">$AERA</span> powered experience.
           </motion.p>
 
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.6, duration: 0.5 }}
-            className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 mb-6"
-          >
-            <button
-              className="group relative overflow-hidden px-8 py-4 rounded-2xl
-                               bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600
-                               hover:from-cyan-500 hover:via-purple-500 hover:to-pink-500
-                               transition-all duration-500 shadow-lg hover:scale-[1.02]
-                               active:scale-[0.98] flex-1 sm:flex-none min-w-[200px]
-                               border border-white/10"
-            >
-              <span className="relative flex items-center justify-center gap-3 text-base sm:text-lg font-bold text-white">
-                <Rocket className="w-5 h-5" />
-                <Link href="/token-sale">Buy $AERA Token</Link>
-                <ExternalLink className="w-5 h-5" />
-              </span>
-              <div className="absolute inset-0 -z-10 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 blur-xl opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
-            </button>
+         {/* CTA Buttons */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={isInView ? { opacity: 1, y: 0 } : {}}
+  transition={{ delay: 0.6, duration: 0.5 }}
+  className="
+    grid gap-4 mb-6
+    grid-cols-1 sm:grid-cols-2
+    max-w-3xl mx-auto
+  "
+>
+  {/* Buy $AERA */}
+  <Link
+    href="/token-sale"
+    className="group relative overflow-hidden px-8 py-4 rounded-2xl
+               bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600
+               hover:from-cyan-500 hover:via-purple-500 hover:to-pink-500
+               transition-all duration-500 shadow-lg hover:scale-[1.02]
+               active:scale-[0.98] flex items-center justify-center gap-3
+               border border-white/10 w-full"
+  >
+    <Rocket className="w-5 h-5 text-white" />
+    <span className="text-base sm:text-lg font-bold text-white">Buy $AERA Token</span>
+    <ExternalLink className="w-5 h-5 text-white" />
+    <div className="absolute inset-0 -z-10 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 blur-xl opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
+  </Link>
 
-            <button
-              onClick={addTokenToMetaMask}
-              disabled={metaMaskStatus === "loading"}
-              className={getButtonClasses()}
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={metaMaskStatus}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                  className="flex items-center justify-center gap-3"
-                >
-                  {getButtonContent()}
-                </motion.div>
-              </AnimatePresence>
-            </button>
-          </motion.div>
+  {/* Add to MetaMask */}
+  <button
+    onClick={addTokenToMetaMask}
+    disabled={metaMaskStatus === "loading"}
+    className={`${getButtonClasses()} w-full`}
+  >
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={metaMaskStatus}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.18 }}
+        className="flex items-center justify-center gap-3"
+      >
+        {getButtonContent()}
+      </motion.div>
+    </AnimatePresence>
+  </button>
+
+  {/* Whitepaper (full-width on both columns) */}
+  <a
+    href="/staera.pdf"
+    download
+    className="
+      sm:col-span-2
+      px-8 py-4 rounded-2xl backdrop-blur-xl
+      transition-all duration-300 flex items-center justify-center gap-3
+      border border-gray-700 bg-gray-900/50
+      hover:border-purple-400/50 hover:bg-gray-800/50
+      hover:scale-[1.02] active:scale-[0.98]
+      w-full
+    "
+  >
+    <span className="text-base sm:text-lg font-semibold text-gray-200">
+      Whitepaper
+    </span>
+    <ExternalLink className="w-5 h-5 text-purple-300" />
+  </a>
+</motion.div>
+
 
           {/* Token Address */}
           <motion.div
@@ -364,7 +386,7 @@ const Hero = () => {
           >
             <div
               className="flex items-center gap-2 px-4 py-2 rounded-xl
-                            bg-gray-900/50 border border-gray-800 backdrop-blur-sm"
+                         bg-gray-900/50 border border-gray-800 backdrop-blur-sm"
             >
               <span className="text-xs sm:text-sm text-gray-400 font-mono">
                 {tokenDetails.address.slice(0, 5)}...{tokenDetails.address.slice(-3)}
@@ -374,9 +396,7 @@ const Hero = () => {
                 className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
                 aria-label="Copy token address"
               >
-                <Copy
-                  className={`w-4 h-4 ${copied ? "text-green-400" : "text-gray-400"}`}
-                />
+                <Copy className={`w-4 h-4 ${copied ? "text-green-400" : "text-gray-400"}`} />
               </button>
             </div>
             <span className="text-xs text-gray-500">Token Address</span>
@@ -402,8 +422,8 @@ const Hero = () => {
                 <div className="flex items-center gap-3 mb-3">
                   <div
                     className="p-2 rounded-xl bg-gradient-to-br from-cyan-900/30 to-purple-900/30 
-                                  border border-cyan-500/20 group-hover:border-cyan-400/50
-                                  transition-colors duration-300"
+                               border border-cyan-500/20 group-hover:border-cyan-400/50
+                               transition-colors duration-300"
                   >
                     <Icon className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300" />
                   </div>
