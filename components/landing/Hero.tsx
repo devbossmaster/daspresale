@@ -328,7 +328,7 @@ const Hero = () => {
             >
               <span className="relative flex items-center justify-center gap-3 text-base sm:text-lg font-bold text-white">
                 <Rocket className="w-5 h-5" />
-                Join Presale Now
+                <Link href="/token-sale">Join Presale Now</Link>
                 <ExternalLink className="w-5 h-5" />
               </span>
               <div className="absolute inset-0 -z-10 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 blur-xl opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
