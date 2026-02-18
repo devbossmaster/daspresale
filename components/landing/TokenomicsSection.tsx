@@ -21,12 +21,13 @@ const TokenomicsSection = () => {
   const tokenData = {
     totalSupply: "21,000,000",
     allocations: [
-      { label: "Public Presale + LP", value: 40, color: "#FF6FD8" },
-      { label: "Staking Rewards", value: 20, color: "#6F8BFF" },
-      { label: "Ecosystem Development", value: 15, color: "#A855F7" },
+      { label: "Public Presale", value: 15, color: "#FF6FD8" },
+      { label: "Liquidity Pool", value: 15, color: "#FF6FD8" },
+      { label: "Rewards", value: 25, color: "#6F8BFF" },
+      { label: "Ecosystem Growth", value: 5, color: "#A855F7" },
       { label: "Team", value: 10, color: "#8B5CF6" },
-      { label: "Advisors & Partners", value: 5, color: "#EC4899" },
-      { label: "CEX Listing", value: 5, color: "#3B82F6" },
+      { label: "Strategic Partnership", value: 5, color: "#EC4899" },
+      { label: "Team", value: 10, color: "#3B82F6" },
       { label: "Marketing & Airdrop", value: 5, color: "#F97316" },
     ],
   };
