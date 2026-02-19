@@ -13,7 +13,6 @@ import {
   XCircle,
   Loader2,
   Copy,
-  Link,
 } from "lucide-react";
 import Link from "next/link";
 
