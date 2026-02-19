@@ -359,7 +359,6 @@ const Hero = () => {
   {/* Whitepaper (full-width on both columns) */}
   <Link
     href="/staera.pdf"
-    download
     className="
       sm:col-span-2
       px-8 py-4 rounded-2xl backdrop-blur-xl
