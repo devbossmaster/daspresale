@@ -13,6 +13,7 @@ import {
   XCircle,
   Loader2,
   Copy,
+  Link,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -373,7 +374,7 @@ const Hero = () => {
       Whitepaper
     </span>
     <ExternalLink className="w-5 h-5 text-purple-300" />
-  </a>
+  </Link>
 </motion.div>
 
 
