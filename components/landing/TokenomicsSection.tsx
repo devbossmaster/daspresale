@@ -93,7 +93,7 @@ const TokenomicsSection = () => {
             </span>
           </h2>
           <p className="text-sm sm:text-base text-zinc-400 max-w-2xl mx-auto">
-            Fixed supply of 1,000,000,000 $AERA with allocations optimized for
+            Fixed supply of 21,000,000 $AERA with allocations optimized for
             long-term ecosystem growth, rewards, and liquidity.
           </p>
         </motion.div>
