@@ -356,7 +356,7 @@ const Hero = () => {
   </button>
 
   {/* Whitepaper (full-width on both columns) */}
-  <a
+  <Link
     href="/staera.pdf"
     download
     className="
