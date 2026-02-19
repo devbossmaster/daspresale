@@ -27,7 +27,7 @@ const TokenomicsSection = () => {
       { label: "Ecosystem Growth", value: 5, color: "#A855F7" },
       { label: "Team", value: 10, color: "#8B5CF6" },
       { label: "Strategic Partnership", value: 5, color: "#EC4899" },
-      { label: "Team", value: 10, color: "#3B82F6" },
+      { label: "Treasury", value: 10, color: "#3B82F6" },
       { label: "Marketing & Airdrop", value: 5, color: "#F97316" },
     ],
   };
