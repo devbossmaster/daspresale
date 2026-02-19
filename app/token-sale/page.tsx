@@ -9,7 +9,7 @@ export default function TokenSalePage() {
           Token Sale
         </h1>
         <p className="text-sm md:text-base text-gray-400 mt-1">
-          Purchase tokens with USDT during the presale phase
+          Purchase tokens with USDT during the presale phase.
         </p>
       </div>
 
