@@ -22,7 +22,7 @@ const TokenomicsSection = () => {
     totalSupply: "21,000,000",
     allocations: [
       { label: "Public Presale", value: 15, color: "#FF6FD8" },
-      { label: "Liquidity Pool", value: 15, color: "#3eb44f" },
+      { label: "Liquidity Pool", value: 25, color: "#3eb44f" },
       { label: "Rewards", value: 25, color: "#6F8BFF" },
       { label: "Ecosystem Growth", value: 5, color: "#A855F7" },
       { label: "Team", value: 10, color: "#8B5CF6" },
