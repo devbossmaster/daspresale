@@ -101,175 +101,169 @@ const FeaturesSection = () => {
   } as const;
 
   return (
-    <section
-      id="features"
-      ref={ref}
-      className="relative overflow-hidden py-20 sm:py-24 lg:py-28"
-    >
-      {/* Premium background ambience */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        {/* section wash */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(99,102,241,0.12),transparent_45%),radial-gradient(circle_at_90%_80%,rgba(59,130,246,0.10),transparent_45%),linear-gradient(to_bottom,rgba(255,255,255,0.01),rgba(255,255,255,0))]" />
+  <section
+    id="features"
+    ref={ref}
+    className="relative isolate overflow-x-clip overflow-y-hidden py-20 sm:py-24 lg:py-28"
+  >
+    {/* Premium background ambience (hard-clipped so no page overflow) */}
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      {/* section wash */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(99,102,241,0.12),transparent_45%),radial-gradient(circle_at_90%_80%,rgba(59,130,246,0.10),transparent_45%),linear-gradient(to_bottom,rgba(255,255,255,0.01),rgba(255,255,255,0))]" />
 
-        {/* left blue glow like screenshot */}
-        <div className="absolute left-[-8%] top-[-5%] h-[520px] w-[420px] rounded-full bg-blue-500/12 blur-3xl" />
+      {/* left blue glow like screenshot */}
+      <div className="absolute -left-24 top-[-5%] h-[520px] w-[420px] rounded-full bg-blue-500/12 blur-3xl" />
 
-        {/* bottom right glow */}
-        <div className="absolute right-[-10%] bottom-[-10%] h-[520px] w-[520px] rounded-full bg-indigo-500/10 blur-3xl" />
+      {/* bottom right glow */}
+      <div className="absolute -right-24 bottom-[-10%] h-[520px] w-[520px] rounded-full bg-indigo-500/10 blur-3xl" />
 
-        {/* soft vertical gradient strip */}
-        <div className="absolute inset-y-0 left-0 w-[35%] bg-gradient-to-r from-blue-500/6 via-indigo-400/4 to-transparent" />
-      </div>
+      {/* soft vertical gradient strip */}
+      <div className="absolute inset-y-0 left-0 w-[35%] bg-gradient-to-r from-blue-500/6 via-indigo-400/4 to-transparent" />
+    </div>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={isInView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.55 }}
+        className="mx-auto mb-12 max-w-4xl text-center sm:mb-14"
+      >
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.55 }}
-          className="mx-auto mb-12 max-w-4xl text-center sm:mb-14"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={isInView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ delay: 0.08, duration: 0.4 }}
+          className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 backdrop-blur-xl"
         >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={isInView ? { opacity: 1, scale: 1 } : {}}
-            transition={{ delay: 0.08, duration: 0.4 }}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 backdrop-blur-xl"
-          >
-            <Zap className="h-4 w-4 text-violet-300" />
-            <span className="text-[11px] sm:text-xs font-medium tracking-[0.16em] uppercase text-white/70">
-              Core Ecosystem
-            </span>
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 18 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.15, duration: 0.5 }}
-            className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white"
-          >
-            Best Features
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.22, duration: 0.5 }}
-            className="mx-auto mt-4 max-w-3xl text-sm sm:text-base leading-7 text-white/55"
-          >
-            AERA powers a multi-utility ecosystem across DeFi, education, real estate,
-            gaming, staking, and scarcity-driven tokenomics — all in one unified Web3 stack.
-          </motion.p>
+          <Zap className="h-4 w-4 text-violet-300" />
+          <span className="text-[11px] sm:text-xs font-medium tracking-[0.16em] uppercase text-white/70">
+            Core Ecosystem
+          </span>
         </motion.div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-12">
-          {features.map((feature, index) => {
-            const accent = accentMap[feature.accent];
-            const Icon = feature.icon;
+        <motion.h2
+          initial={{ opacity: 0, y: 18 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.15, duration: 0.5 }}
+          className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-white"
+        >
+          Best Features
+        </motion.h2>
 
-            // Layout pattern similar to premium screenshot feel
-            // Top row: 3 cards, Bottom row: 3 cards (last row can stretch on xl)
-            const spanClass =
-              index < 3
-                ? "xl:col-span-4"
-                : index < 5
-                ? "xl:col-span-6"
-                : "xl:col-span-12";
+        <motion.p
+          initial={{ opacity: 0, y: 18 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ delay: 0.22, duration: 0.5 }}
+          className="mx-auto mt-4 max-w-3xl text-sm sm:text-base leading-7 text-white/55"
+        >
+          AERA powers a multi-utility ecosystem across DeFi, education, real estate,
+          gaming, staking, and scarcity-driven tokenomics — all in one unified Web3 stack.
+        </motion.p>
+      </motion.div>
 
-            return (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20, scale: 0.985 }}
-                animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ delay: 0.28 + index * 0.06, duration: 0.45 }}
-                whileHover={{ y: -4 }}
-                className={`group relative ${spanClass}`}
+      {/* Grid */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-12">
+        {features.map((feature, index) => {
+          const accent = accentMap[feature.accent];
+          const Icon = feature.icon;
+
+          const spanClass =
+            index < 3 ? "xl:col-span-4" : index < 5 ? "xl:col-span-6" : "xl:col-span-12";
+
+          return (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 20, scale: 0.985 }}
+              animate={isInView ? { opacity: 1, y: 0, scale: 1 } : {}}
+              transition={{ delay: 0.28 + index * 0.06, duration: 0.45 }}
+              whileHover={{ y: -4 }}
+              className={`group relative min-w-0 ${spanClass}`}
+            >
+              <div
+                className={[
+                  "relative h-full max-w-full overflow-hidden rounded-3xl border border-white/10",
+                  "bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]",
+                  "backdrop-blur-xl p-6 sm:p-7",
+                  "transition-all duration-300",
+                  "hover:border-white/15",
+                  accent.hoverGlow,
+                ].join(" ")}
               >
+                {/* Neon top border line */}
                 <div
-                  className={[
-                    "relative h-full overflow-hidden rounded-3xl border border-white/10",
-                    "bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]",
-                    "backdrop-blur-xl p-6 sm:p-7",
-                    "transition-all duration-300",
-                    "hover:border-white/15",
-                    accent.hoverGlow,
-                  ].join(" ")}
-                >
-                  {/* Neon top border line */}
-                  <div
-                    className={`pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r ${accent.line} opacity-90`}
-                  />
-                  <div
-                    className={`pointer-events-none absolute inset-x-12 top-0 h-[2px] bg-gradient-to-r ${accent.line} blur-sm opacity-60`}
-                  />
+                  className={`pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r ${accent.line} opacity-90`}
+                />
+                <div
+                  className={`pointer-events-none absolute inset-x-12 top-0 h-[2px] bg-gradient-to-r ${accent.line} blur-sm opacity-60`}
+                />
 
-                  {/* Neon bottom border line */}
-                  <div
-                    className={`pointer-events-none absolute inset-x-8 bottom-0 h-px bg-gradient-to-r ${accent.line} opacity-80`}
-                  />
-                  <div
-                    className={`pointer-events-none absolute inset-x-12 bottom-0 h-[2px] bg-gradient-to-r ${accent.line} blur-sm opacity-50`}
-                  />
+                {/* Neon bottom border line */}
+                <div
+                  className={`pointer-events-none absolute inset-x-8 bottom-0 h-px bg-gradient-to-r ${accent.line} opacity-80`}
+                />
+                <div
+                  className={`pointer-events-none absolute inset-x-12 bottom-0 h-[2px] bg-gradient-to-r ${accent.line} blur-sm opacity-50`}
+                />
 
-                  {/* Corner glow */}
-                  <div
-                    className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full ${accent.glow} blur-2xl opacity-50`}
-                  />
-                  <div
-                    className={`pointer-events-none absolute -left-8 bottom-2 h-20 w-20 rounded-full ${accent.glow} blur-2xl opacity-20`}
-                  />
+                {/* Corner glow */}
+                <div
+                  className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full ${accent.glow} blur-2xl opacity-50`}
+                />
+                <div
+                  className={`pointer-events-none absolute -left-8 bottom-2 h-20 w-20 rounded-full ${accent.glow} blur-2xl opacity-20`}
+                />
 
-                  {/* Inner subtle gradient sweep */}
-                  <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.06),transparent_45%)]" />
-                  </div>
+                {/* Inner subtle gradient sweep */}
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.06),transparent_45%)]" />
+                </div>
 
-                  {/* Icon */}
-                  <div className="relative mb-5">
+                {/* Icon */}
+                <div className="relative mb-5">
+                  <div
+                    className={[
+                      "inline-flex h-14 w-14 items-center justify-center rounded-2xl",
+                      "border border-white/10 bg-black/20 backdrop-blur-xl",
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
+                      accent.ring,
+                    ].join(" ")}
+                  >
                     <div
                       className={[
-                        "inline-flex h-14 w-14 items-center justify-center rounded-2xl",
-                        "border border-white/10 bg-black/20 backdrop-blur-xl",
-                        "shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]",
-                        accent.ring,
+                        "absolute inset-0 rounded-2xl opacity-70",
+                        accent.iconBg,
                       ].join(" ")}
-                    >
-                      <div
-                        className={[
-                          "absolute inset-0 rounded-2xl opacity-70",
-                          accent.iconBg,
-                        ].join(" ")}
-                      />
-                      <Icon className={`relative h-6 w-6 ${accent.iconText}`} />
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <h3 className="relative text-xl sm:text-2xl font-semibold tracking-tight text-white">
-                    {feature.title}
-                  </h3>
-
-                  <p className="relative mt-3 text-sm sm:text-base leading-7 text-white/55 max-w-[60ch]">
-                    {feature.description}
-                  </p>
-
-                  {/* Footer CTA */}
-                  <div className="relative mt-6 flex items-center justify-between">
-                    <button className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-medium text-white/75 backdrop-blur-md transition-all duration-300 hover:bg-white/[0.05] hover:text-white hover:border-white/20">
-                      Learn more
-                      <ExternalLink className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
-                    </button>
-
-                    <div className="h-px flex-1 ml-4 bg-gradient-to-r from-white/10 to-transparent" />
+                    />
+                    <Icon className={`relative h-6 w-6 ${accent.iconText}`} />
                   </div>
                 </div>
-              </motion.div>
-            );
-          })}
-        </div>
+
+                {/* Content */}
+                <h3 className="relative text-xl sm:text-2xl font-semibold tracking-tight text-white break-words">
+                  {feature.title}
+                </h3>
+
+                <p className="relative mt-3 max-w-[60ch] text-sm sm:text-base leading-7 text-white/55 break-words">
+                  {feature.description}
+                </p>
+
+                {/* Footer CTA */}
+                <div className="relative mt-6 flex min-w-0 items-center justify-between">
+                  <button className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-medium text-white/75 backdrop-blur-md transition-all duration-300 hover:bg-white/[0.05] hover:text-white hover:border-white/20">
+                    Learn more
+                    <ExternalLink className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                  </button>
+
+                  <div className="ml-4 h-px min-w-0 flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
-    </section>
-  );
-};
+    </div>
+  </section>
+);
+}
 
 export default FeaturesSection;

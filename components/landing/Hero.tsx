@@ -189,15 +189,15 @@ export default function Hero() {
     <section
       id="home"
       ref={ref}
-      className="relative overflow-hidden pt-20 pb-14 sm:pt-24 sm:pb-18 lg:pt-32 lg:pb-24"
+        className="relative overflow-hidden pt-12"
     >
-     {/* Hero-only overlays */}
-<div className="pointer-events-none absolute inset-0">
-  <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.32),rgba(0,0,0,0.08)_28%,rgba(0,0,0,0.16)_72%,rgba(0,0,0,0.38))]" />
-  <div className="absolute -top-24 left-1/2 h-[22rem] w-[42rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-3xl" />
-  <div className="absolute top-16 right-[-8rem] h-[18rem] w-[18rem] rounded-full bg-indigo-500/10 blur-3xl" />
-  <div className="absolute bottom-[-6rem] left-1/2 h-[14rem] w-[55rem] -translate-x-1/2 rounded-full bg-sky-400/10 blur-3xl" />
-</div>
+   {/* Hero-only overlays (transparent feel, no dark wash layer) */}
+  <div className="pointer-events-none absolute inset-0">
+    {/* removed heavy black gradient overlay for transparent hero look */}
+    <div className="absolute -top-20 left-1/2 h-[20rem] w-[40rem] -translate-x-1/2 rounded-full bg-violet-500/8 blur-3xl" />
+    <div className="absolute top-8 right-[-8rem] h-[16rem] w-[16rem] rounded-full bg-indigo-500/8 blur-3xl" />
+    <div className="absolute bottom-[-5rem] left-1/2 h-[12rem] w-[52rem] -translate-x-1/2 rounded-full bg-sky-400/8 blur-3xl" />
+  </div>
       <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid items-start gap-8 lg:items-center lg:gap-10 lg:grid-cols-12">
           {/* LEFT SIDE */}
@@ -327,41 +327,39 @@ export default function Hero() {
 </motion.div>
 </motion.div>
 
-          {/* RIGHT SIDE - Animated Visual */}
-          <motion.div
-            initial={{ opacity: 0, x: 24 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
-            transition={{ delay: 0.2, duration: 0.65 }}
-            className="min-w-0 lg:col-span-6 xl:col-span-6"
-          >
-            <div className="relative mx-auto w-full max-w-[680px]">
-              {/* Frame */}
-              <div className="absolute inset-0 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm" />
-              <div className="absolute inset-x-8 top-0 h-p bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+        {/* RIGHT SIDE - Animated Visual */}
+<motion.div
+  initial={{ opacity: 0, x: 24 }}
+  animate={isInView ? { opacity: 1, x: 0 } : {}}
+  transition={{ delay: 0.2, duration: 0.65 }}
+  className="min-w-0 lg:col-span-6 xl:col-span-6 lg:-mt-2"
+>
+  <div className="relative mx-auto w-full max-w-[680px]">
+    {/* Visual (transparent, no frame) */}
+    <div className="relative overflow-visible rounded-3xl bg-transparent">
+      <AeraPrismVisual />
+    </div>
 
-              {/* Visual */}
-              <div className="relative overflow-hidden rounded-3xl">
-                <AeraPrismVisual />
-              </div>
+    {/* Floating chips - hidden on mobile for clean layout */}
+    <motion.div
+      className="absolute left-4 top-6 hidden rounded-xl border border-white/10 bg-black/25 px-3 py-2 backdrop-blur-xl sm:block"
+      animate={{ y: [0, -6, 0] }}
+      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">Network</p>
+      <p className="text-sm font-semibold text-white">BNB Smart Chain</p>
+    </motion.div>
 
-              {/* Floating chips - hidden on mobile for clean layout */}
-              <motion.div
-                className="absolute left-4 top-6 hidden rounded-xl border border-white/10 bg-black/30 px-3 py-2 backdrop-blur-xl sm:block"
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">Network</p>
-                <p className="text-sm font-semibold text-white">BNB Smart Chain</p>
-              </motion.div>
-
-              <motion.div
-                className="absolute right-6 bottom-5 hidden rounded-xl border border-violet-300/15 bg-black px-10 py-2 backdrop-blur-xl sm:block"
-              >
-                <p className="text-[10px] uppercase tracking-[0.16em] text-white/50 ">Token</p>
-                <p className="text-sm font-semibold text-violet-200">$AERA</p>
-              </motion.div>
-            </div>
-          </motion.div>
+    <motion.div
+      className="absolute right-6 bottom-5 hidden rounded-xl border border-violet-300/15 bg-black/70 px-4 py-2 backdrop-blur-xl sm:block"
+      animate={{ y: [0, 4, 0], opacity: [0.9, 1, 0.9] }}
+      transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">Token</p>
+      <p className="text-sm font-semibold text-violet-200">$AERA</p>
+    </motion.div>
+  </div>
+</motion.div>
         </div>
       </div>
     </section>
