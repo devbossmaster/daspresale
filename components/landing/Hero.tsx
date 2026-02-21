@@ -15,6 +15,7 @@ import {
   Copy,
 } from "lucide-react";
 import Link from "next/link";
+import AeraPrismVisual from "./AeraPrismVisual";
 
 type MetaMaskStatus = "idle" | "loading" | "success" | "error";
 
@@ -40,7 +41,6 @@ const ensureBSCNetwork = async (ethereum: any) => {
       params: [{ chainId: BSC_CHAIN_ID }],
     });
   } catch (switchErr: any) {
-    // 4902 = chain not added to MetaMask yet
     if (switchErr?.code === 4902) {
       await ethereum.request({
         method: "wallet_addEthereumChain",
@@ -61,37 +61,36 @@ const watchAsset = async (ethereum: any, token: any) => {
         address: token.address,
         symbol: token.symbol,
         decimals: token.decimals,
-        image: token.image || undefined, // recommended: real https logo url
+        image: token.image || undefined,
       },
     },
   });
 };
 
-const Hero = () => {
+export default function Hero() {
   const ref = useRef<HTMLDivElement | null>(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   const [metaMaskStatus, setMetaMaskStatus] = useState<MetaMaskStatus>("idle");
   const [copied, setCopied] = useState(false);
 
-  // Stats data
-  const stats = [
-    { label: "Total Supply", value: "21M", sub: "$AERA Tokens", icon: TrendingUp },
-    { label: "Network", value: "BSC", sub: "Binance Smart Chain", icon: Globe },
-  ];
+ 
 
-  // Token details
   const tokenDetails = {
     address: "0x2191f59b994E7Ad5BFf3C2F3abDe36167570822F",
     symbol: "AERA",
     decimals: 18,
-    image: "", // put your token logo URL (https://...) for best UX
+    image: "",
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(tokenDetails.address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(tokenDetails.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch (e) {
+      console.error("Clipboard copy failed:", e);
+    }
   };
 
   const addTokenToMetaMask = useCallback(async () => {
@@ -102,15 +101,13 @@ const Hero = () => {
 
       if (!ethereum?.isMetaMask) {
         setMetaMaskStatus("error");
-        window.open("https://metamask.io/download/", "_blank");
+        window.open("https://metamask.io/download/", "_blank", "noopener,noreferrer");
         setTimeout(() => setMetaMaskStatus("idle"), 1600);
         return;
       }
 
-      // 1) Ensure BSC so token appears right away
       await ensureBSCNetwork(ethereum);
 
-      // 2) Try adding token without forcing connect (faster)
       try {
         const wasAdded = await watchAsset(ethereum, tokenDetails);
 
@@ -122,16 +119,13 @@ const Hero = () => {
         }
         return;
       } catch (err: any) {
-        // If permissions needed, request accounts then retry once
         const needsPermissions =
           err?.code === 4100 || err?.message?.toLowerCase?.().includes("unauthorized");
 
         if (!needsPermissions) throw err;
       }
 
-      // 3) Permission path (only when required)
       await ethereum.request({ method: "eth_requestAccounts" });
-
       const wasAdded = await watchAsset(ethereum, tokenDetails);
 
       if (wasAdded) {
@@ -141,13 +135,11 @@ const Hero = () => {
         setMetaMaskStatus("idle");
       }
     } catch (error: any) {
-      // user rejected popup
       if (error?.code === 4001) {
         setMetaMaskStatus("idle");
         return;
       }
 
-      // already pending request in MetaMask
       if (error?.code === -32002) {
         setMetaMaskStatus("loading");
         setTimeout(() => setMetaMaskStatus("idle"), 1600);
@@ -165,280 +157,213 @@ const Hero = () => {
       case "loading":
         return (
           <>
-            <Loader2 className="w-5 h-5 text-purple-300 animate-spin" />
-            <span className="text-base sm:text-lg font-semibold text-gray-200">
-              Adding...
-            </span>
+            <Loader2 className="h-4 w-4 animate-spin text-violet-300" />
+            <span className="text-sm sm:text-base font-medium text-white/90">Adding...</span>
           </>
         );
       case "success":
         return (
           <>
-            <CheckCircle className="w-5 h-5 text-green-400" />
-            <span className="text-base sm:text-lg font-semibold text-green-400">
-              Added Successfully!
-            </span>
+            <CheckCircle className="h-4 w-4 text-emerald-400" />
+            <span className="text-sm sm:text-base font-medium text-emerald-300">Added</span>
           </>
         );
       case "error":
         return (
           <>
-            <XCircle className="w-5 h-5 text-red-400" />
-            <span className="text-base sm:text-lg font-semibold text-red-400">
-              Install MetaMask
-            </span>
+            <XCircle className="h-4 w-4 text-red-400" />
+            <span className="text-sm sm:text-base font-medium text-red-300">Install MetaMask</span>
           </>
         );
       default:
         return (
           <>
-            <Wallet className="w-5 h-5 text-purple-300" />
-            <span className="text-base sm:text-lg font-semibold text-gray-200">
-              Add $AERA to MetaMask
-            </span>
+            <Wallet className="h-4 w-4 text-violet-300" />
+            <span className="text-sm sm:text-base font-medium text-white/90">Add to MetaMask</span>
           </>
         );
-    }
-  };
-
-  const getButtonClasses = () => {
-    const baseClasses = `px-8 py-4 rounded-2xl backdrop-blur-xl
-      transition-all duration-300 flex items-center justify-center gap-3
-      w-full disabled:opacity-50 disabled:cursor-not-allowed`;
-
-    switch (metaMaskStatus) {
-      case "loading":
-        return `${baseClasses} border border-purple-500/50 bg-purple-900/30 cursor-wait`;
-      case "success":
-        return `${baseClasses} border border-green-500/50 bg-green-900/20`;
-      case "error":
-        return `${baseClasses} border border-red-500/50 bg-red-900/20`;
-      default:
-        return `${baseClasses} border border-gray-700 bg-gray-900/50
-          hover:border-purple-400/50 hover:bg-gray-800/50
-          hover:scale-[1.02] active:scale-[0.98]`;
     }
   };
 
   return (
-    <section id="home" ref={ref} className="relative overflow-hidden bg-black pt-24 pb-16">
-      {/* Animated gradient orbs background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 90, 0],
-            x: ["-10%", "10%", "-10%"],
-            y: ["-10%", "10%", "-10%"],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full
-                     bg-gradient-to-r from-cyan-500/20 to-purple-500/20 blur-3xl"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, -90, 0],
-            x: ["10%", "-10%", "10%"],
-            y: ["10%", "-10%", "10%"],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-          className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] rounded-full
-                     bg-gradient-to-r from-purple-500/20 to-pink-500/20 blur-3xl"
-        />
-        {/* Grid overlay */}
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-20" />
-      </div>
-
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 40 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="max-w-6xl mx-auto text-center"
-        >
-          {/* Badge */}
+    <section
+      id="home"
+      ref={ref}
+      className="relative overflow-hidden pt-20 pb-14 sm:pt-24 sm:pb-18 lg:pt-32 lg:pb-24"
+    >
+     {/* Hero-only overlays */}
+<div className="pointer-events-none absolute inset-0">
+  <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.32),rgba(0,0,0,0.08)_28%,rgba(0,0,0,0.16)_72%,rgba(0,0,0,0.38))]" />
+  <div className="absolute -top-24 left-1/2 h-[22rem] w-[42rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-3xl" />
+  <div className="absolute top-16 right-[-8rem] h-[18rem] w-[18rem] rounded-full bg-indigo-500/10 blur-3xl" />
+  <div className="absolute bottom-[-6rem] left-1/2 h-[14rem] w-[55rem] -translate-x-1/2 rounded-full bg-sky-400/10 blur-3xl" />
+</div>
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid items-start gap-8 lg:items-center lg:gap-10 lg:grid-cols-12">
+          {/* LEFT SIDE */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={isInView ? { opacity: 1, scale: 1 } : {}}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex items-center gap-3 px-4 py-2.5 rounded-full
-                       bg-gradient-to-r from-cyan-900/30 via-purple-900/30 to-pink-900/30
-                       border border-cyan-500/20 backdrop-blur-xl mb-6
-                       shadow-lg shadow-cyan-500/10"
+            initial={{ opacity: 0, y: 24 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7 }}
+            className="min-w-0 lg:col-span-6 xl:col-span-6"
           >
-            <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span
-              className="text-xs sm:text-sm font-medium bg-gradient-to-r
-                             from-cyan-300 via-purple-300 to-pink-300
-                             bg-clip-text text-transparent"
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ delay: 0.1, duration: 0.45 }}
+              className="mb-5 inline-flex max-w-full items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-2 backdrop-blur-xl"
             >
-              THE NEXT BITCOIN
-            </span>
-          </motion.div>
+              <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/25 to-sky-400/20 ring-1 ring-white/10">
+                <Sparkles className="h-3.5 w-3.5 text-violet-200" />
+              </span>
+              <span className="truncate text-[11px] sm:text-xs font-medium tracking-[0.18em] uppercase text-white/70">
+                THE NEXT BITCOIN
+              </span>
+            </motion.div>
 
-          {/* Heading */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight mb-4">
-            <span className="block bg-gradient-to-r from-cyan-400 via-white to-purple-400 bg-clip-text text-transparent">
-              Multi-Utility Web3 Ecosystem
-            </span>
-          </h1>
+            {/* Headline */}
+            <motion.h1
+              initial={{ opacity: 0, y: 14 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.2, duration: 0.6 }}
+              className="text-[2.2rem] leading-[0.95] font-bold tracking-tight text-white sm:text-5xl md:text-6xl xl:text-7xl"
+              style={{ textShadow: "0 8px 30px rgba(0,0,0,0.32)" }}
+            >
+              Bring Real-World <br />
+              Assets On-{" "}
+              <span className="bg-gradient-to-r from-violet-300 to-violet-500 bg-clip-text text-transparent">
+                Chain
+              </span>
+            </motion.h1>
 
-          {/* Subtitle */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={isInView ? { opacity: 1 } : {}}
-            transition={{ delay: 0.5, duration: 0.7 }}
-            className="text-base sm:text-lg md:text-xl text-gray-300 mb-6
-                       max-w-3xl mx-auto leading-relaxed"
-          >
-            Staera revolutionizes the blockchain space by unifying{" "}
-            <span className="font-semibold text-cyan-300">DeFi</span>,{" "}
-            <span className="font-semibold text-purple-300">AI Projects</span>,{" "}
-            <span className="font-semibold text-purple-300">Real-World Assets</span>, and{" "}
-            <span className="font-semibold text-purple-300">Web3 Gaming</span> into a single,
-            seamless <span className="font-bold text-blue-300">$AERA</span> powered experience.
-          </motion.p>
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.32, duration: 0.55 }}
+              className="mt-5 max-w-xl text-sm leading-7 text-white/70 sm:text-base sm:leading-8 md:text-lg"
+            >
+              Staera unifies <span className="font-semibold text-white/90">DeFi</span>,{" "}
+              <span className="font-semibold text-white/90">AI projects</span>,{" "}
+              <span className="font-semibold text-white/90">real-world assets</span>, and{" "}
+              <span className="font-semibold text-white/90">Web3 gaming</span> into one seamless
+              ecosystem powered by <span className="font-bold text-violet-300">$AERA</span>.
+            </motion.p>
 
-         {/* CTA Buttons */}
+          {/* CTA Buttons - mobile 2x2 grid / desktop keeps current style */}
 <motion.div
-  initial={{ opacity: 0, y: 20 }}
+  initial={{ opacity: 0, y: 16 }}
   animate={isInView ? { opacity: 1, y: 0 } : {}}
-  transition={{ delay: 0.6, duration: 0.5 }}
-  className="
-    grid gap-4 mb-6
-    grid-cols-1 sm:grid-cols-2
-    max-w-3xl mx-auto
-  "
+  transition={{ delay: 0.42, duration: 0.55 }}
+  className="mt-7 grid max-w-md grid-cols-2 gap-3 sm:max-w-xl sm:grid-cols-2"
 >
   {/* Buy $AERA */}
   <Link
     href="/token-sale"
-    className="group relative overflow-hidden px-8 py-4 rounded-2xl
-               bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600
-               hover:from-cyan-500 hover:via-purple-500 hover:to-pink-500
-               transition-all duration-500 shadow-lg hover:scale-[1.02]
-               active:scale-[0.98] flex items-center justify-center gap-3
-               border border-white/10 w-full"
+    className="group inline-flex h-14 w-full min-w-0 items-center justify-center gap-2 rounded-full px-4
+               text-sm sm:text-base font-semibold text-white
+               bg-gradient-to-r from-violet-500 to-purple-600
+               shadow-[0_8px_30px_rgba(124,58,237,0.35)]
+               hover:shadow-[0_12px_40px_rgba(124,58,237,0.45)]
+               hover:-translate-y-0.5 transition-all duration-300"
   >
-    <Rocket className="w-5 h-5 text-white" />
-    <span className="text-base sm:text-lg font-bold text-white">Buy $AERA Token</span>
-    <ExternalLink className="w-5 h-5 text-white" />
-    <div className="absolute inset-0 -z-10 bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 blur-xl opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
+    <Rocket className="h-4 w-4 shrink-0" />
+    <span className="truncate">Buy $AERA</span>
+    <ExternalLink className="h-4 w-4 shrink-0" />
   </Link>
 
   {/* Add to MetaMask */}
   <button
     onClick={addTokenToMetaMask}
     disabled={metaMaskStatus === "loading"}
-    className={`${getButtonClasses()} w-full`}
+    className="inline-flex h-14 w-full min-w-0 items-center justify-center gap-2 rounded-full
+               border border-white/10 bg-white/[0.03] backdrop-blur-xl
+               px-4 text-sm sm:text-base font-medium text-white/90
+               hover:bg-white/[0.06] hover:border-white/20
+               hover:-translate-y-0.5 transition-all duration-300
+               disabled:opacity-70 disabled:cursor-not-allowed"
   >
     <AnimatePresence mode="wait">
-      <motion.div
+      <motion.span
         key={metaMaskStatus}
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.18 }}
-        className="flex items-center justify-center gap-3"
+        exit={{ opacity: 0, y: -4 }}
+        transition={{ duration: 0.15 }}
+        className="inline-flex min-w-0 items-center gap-2"
       >
         {getButtonContent()}
-      </motion.div>
+      </motion.span>
     </AnimatePresence>
   </button>
 
-  {/* Whitepaper (full-width on both columns) */}
+  {/* Whitepaper - mobile grid item / desktop full-width row */}
   <Link
     href="/staera.pdf"
-    className="
-      sm:col-span-2
-      px-8 py-4 rounded-2xl backdrop-blur-xl
-      transition-all duration-300 flex items-center justify-center gap-3
-      border border-gray-700 bg-gray-900/50
-      hover:border-purple-400/50 hover:bg-gray-800/50
-      hover:scale-[1.02] active:scale-[0.98]
-      w-full
-    "
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex h-12 w-full min-w-0 items-center justify-center gap-2 rounded-full
+               border border-white/10 bg-black/20 px-4 text-sm text-white/80 backdrop-blur-xl
+               transition hover:bg-white/[0.04] hover:border-violet-300/20
+               sm:col-span-2"
   >
-    <span className="text-base sm:text-lg font-semibold text-gray-200">
-      Whitepaper
-    </span>
-    <ExternalLink className="w-5 h-5 text-purple-300" />
+    <span className="truncate">Whitepaper</span>
+    <ExternalLink className="h-4 w-4 shrink-0 text-violet-300" />
   </Link>
+
+  {/* BscScan - MOBILE ONLY (becomes 4th grid item) */}
+  <a
+    href={`https://bscscan.com/token/${tokenDetails.address}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex h-12 w-full items-center justify-center gap-1 rounded-full
+               border border-white/10 bg-white/[0.02] px-4 text-sm text-white/70
+               transition hover:bg-white/[0.06] hover:text-white sm:hidden"
+  >
+    BscScan
+    <ExternalLink className="h-3.5 w-3.5" />
+  </a>
+</motion.div>
 </motion.div>
 
-
-          {/* Token Address */}
+          {/* RIGHT SIDE - Animated Visual */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.7, duration: 0.5 }}
-            className="flex items-center justify-center gap-2 mb-8"
+            initial={{ opacity: 0, x: 24 }}
+            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            transition={{ delay: 0.2, duration: 0.65 }}
+            className="min-w-0 lg:col-span-6 xl:col-span-6"
           >
-            <div
-              className="flex items-center gap-2 px-4 py-2 rounded-xl
-                         bg-gray-900/50 border border-gray-800 backdrop-blur-sm"
-            >
-              <span className="text-xs sm:text-sm text-gray-400 font-mono">
-                {tokenDetails.address.slice(0, 5)}...{tokenDetails.address.slice(-3)}
-              </span>
-              <button
-                onClick={copyToClipboard}
-                className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
-                aria-label="Copy token address"
-              >
-                <Copy className={`w-4 h-4 ${copied ? "text-green-400" : "text-gray-400"}`} />
-              </button>
-            </div>
-            <span className="text-xs text-gray-500">Token Address</span>
-          </motion.div>
+            <div className="relative mx-auto w-full max-w-[680px]">
+              {/* Frame */}
+              <div className="absolute inset-0 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-sm" />
+              <div className="absolute inset-x-8 top-0 h-p bg-gradient-to-r from-transparent via-white/25 to-transparent" />
 
-          {/* Stats Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={isInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.8, duration: 0.5 }}
-            className="grid grid-cols-2 gap-4 max-w-2xl mx-auto"
-          >
-            {stats.map(({ label, value, sub, icon: Icon }) => (
+              {/* Visual */}
+              <div className="relative overflow-hidden rounded-3xl">
+                <AeraPrismVisual />
+              </div>
+
+              {/* Floating chips - hidden on mobile for clean layout */}
               <motion.div
-                key={label}
-                whileHover={{ scale: 1.05, y: -5 }}
-                transition={{ type: "spring", stiffness: 300 }}
-                className="p-5 rounded-2xl border border-gray-800
-                           bg-gradient-to-b from-gray-900/60 to-black/60
-                           backdrop-blur-xl hover:border-cyan-500/30
-                           transition-all duration-300 group"
+                className="absolute left-4 top-6 hidden rounded-xl border border-white/10 bg-black/30 px-3 py-2 backdrop-blur-xl sm:block"
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="p-2 rounded-xl bg-gradient-to-br from-cyan-900/30 to-purple-900/30 
-                               border border-cyan-500/20 group-hover:border-cyan-400/50
-                               transition-colors duration-300"
-                  >
-                    <Icon className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300" />
-                  </div>
-                  <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    {label}
-                  </div>
-                </div>
-                <div className="text-xl font-bold text-white mb-1">{value}</div>
-                <div className="text-xs text-gray-500">{sub}</div>
+                <p className="text-[10px] uppercase tracking-[0.16em] text-white/50">Network</p>
+                <p className="text-sm font-semibold text-white">BNB Smart Chain</p>
               </motion.div>
-            ))}
+
+              <motion.div
+                className="absolute right-6 bottom-5 hidden rounded-xl border border-violet-300/15 bg-black px-10 py-2 backdrop-blur-xl sm:block"
+              >
+                <p className="text-[10px] uppercase tracking-[0.16em] text-white/50 ">Token</p>
+                <p className="text-sm font-semibold text-violet-200">$AERA</p>
+              </motion.div>
+            </div>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
-};
-
-export default Hero;
+}
