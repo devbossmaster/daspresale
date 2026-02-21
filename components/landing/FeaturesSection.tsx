@@ -106,20 +106,7 @@ const FeaturesSection = () => {
     ref={ref}
     className="relative isolate overflow-x-clip overflow-y-hidden py-20 sm:py-24 lg:py-28"
   >
-    {/* Premium background ambience (hard-clipped so no page overflow) */}
-    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      {/* section wash */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(99,102,241,0.12),transparent_45%),radial-gradient(circle_at_90%_80%,rgba(59,130,246,0.10),transparent_45%),linear-gradient(to_bottom,rgba(255,255,255,0.01),rgba(255,255,255,0))]" />
-
-      {/* left blue glow like screenshot */}
-      <div className="absolute -left-24 top-[-5%] h-[520px] w-[420px] rounded-full bg-blue-500/12 blur-3xl" />
-
-      {/* bottom right glow */}
-      <div className="absolute -right-24 bottom-[-10%] h-[520px] w-[520px] rounded-full bg-indigo-500/10 blur-3xl" />
-
-      {/* soft vertical gradient strip */}
-      <div className="absolute inset-y-0 left-0 w-[35%] bg-gradient-to-r from-blue-500/6 via-indigo-400/4 to-transparent" />
-    </div>
+ 
 
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       {/* Header */}
