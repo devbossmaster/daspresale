@@ -11,7 +11,7 @@ import AppShell from "@/components/layout/AppShell";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Web3 Presale Platform",
+  title: "Staera Presale",
   description: "Modern token presale platform for Web3 projects",
 };
 
